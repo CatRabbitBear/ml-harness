@@ -1,0 +1,81 @@
+[project]
+name = "ml-harness"
+version = "0.1.0"
+description = "ML Harness: A framework for building, training, and deploying machine learning models with ease."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "hmmlearn>=0.3.3",
+    "mlflow>=3.8.1",
+    "numpy>=2.4.1",
+    "pandas>=2.3.3",
+    "pyarrow>=22.0.0",
+    "pydantic>=2.12.5",
+    "pydantic-settings>=2.12.0",
+    "python-dotenv>=1.2.1",
+    "rich>=14.3.1",
+    "scikit-learn>=1.8.0",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.19.1",
+    "pre-commit>=4.5.1",
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
+    "ruff>=0.14.14",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+fix = true
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.ruff.lint]
+select = [
+  "E",   # pycodestyle errors
+  "F",   # pyflakes
+  "I",   # isort
+  "UP",  # pyupgrade
+  "B",   # bugbear
+]
+ignore = [
+  "E501",  # line length (formatter handles it)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["core", "plugins", "apps"]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["core/tests", "apps", "plugins"]
+python_files = ["test_*.py"]
+addopts = [
+  "-ra",
+  "--strict-markers",
+]
+
+[tool.mypy]
+python_version = "3.11"
+warn_unused_configs = true
+ignore_missing_imports = true
+follow_imports = "silent"
+
+disallow_untyped_defs = false
+check_untyped_defs = false
+
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_return_any = false
+
+[[tool.mypy.overrides]]
+module = [
+  "plugins.*",
+  "apps.*",
+]
+ignore_errors = true
