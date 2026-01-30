@@ -1,0 +1,31 @@
+# Python / venv
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ruff / pytest / tooling caches
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+
+# Local artifacts & outputs
+.artifacts/
+artifacts/
+mlruns/
+
+# Git
+.git/
+.gitignore
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Build outputs
+dist/
+build/
+*.egg-info/

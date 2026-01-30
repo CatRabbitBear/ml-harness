@@ -19,6 +19,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.mlflow
+    environment:
+      MLFLOW_SERVER_ALLOWED_HOSTS: "mlflow,mlflow:5000,localhost:*"
+      # MLFLOW_SERVER_CORS_ALLOWED_ORIGINS: "http://localhost:5000"
     command:
       [
         "server",
@@ -36,6 +39,21 @@ services:
         condition: service_healthy
     ports:
       - "5000:5000"
+    volumes:
+      - mlflow_artifacts:/shared/artifacts
+
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.app
+    command: ["python", "-m", "apps.smoke_run"]
+    environment:
+      CORE_ARTIFACT_ROOT: /shared/artifacts
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_EXPERIMENT: ml-harness-dev
+    depends_on:
+      mlflow:
+        condition: service_started
     volumes:
       - mlflow_artifacts:/shared/artifacts
 

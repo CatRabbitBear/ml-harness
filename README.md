@@ -44,3 +44,19 @@ http://localhost:5000
 ```
 
 Artifacts are stored on a shared Docker volume mounted at `/shared/artifacts` in the MLflow container.
+
+## Run smoke test in Docker
+
+Start the stack (if not already running):
+
+```bash
+docker compose -f deploy/docker-compose.yml up --build
+```
+
+Then run the smoke test as a one-shot container:
+
+```bash
+docker compose -f deploy/docker-compose.yml run --rm app
+```
+
+The run should appear in the MLflow UI with `smoke_metric` and `smoke/hello.txt`.
