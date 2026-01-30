@@ -1,23 +1,22 @@
 from __future__ import annotations
 
+import json
 import logging
+import traceback
 from collections.abc import Mapping
 from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
-from uuid import uuid4
 
 from core.contracts import PluginNotFoundError, PluginRegistry, RunResult, RunSpec
 from core.contracts.run_context import RunContext
 from core.contracts.run_result import RunStatus
 from core.contracts.tracking import TrackingClient
+from core.runtime.artifacts import build_run_artifact_dir
+from core.tracking import FakeTrackingClient
 
 
 class SpecValidationError(ValueError):
-    pass
-
-
-class RegistryNotConfiguredError(RuntimeError):
     pass
 
 
@@ -39,101 +38,249 @@ def validate_spec(spec: RunSpec) -> None:
         raise SpecValidationError("; ".join(errors))
 
 
-def run_pipeline(spec: RunSpec, *, registry: PluginRegistry | None = None) -> RunResult:
+def run_pipeline(
+    spec: RunSpec,
+    *,
+    registry: PluginRegistry,
+    tracking: TrackingClient | None = None,
+) -> RunResult:
+    """Run the v1 orchestration lifecycle for a spec."""
     validate_spec(spec)
-
-    if registry is None:
-        # v1 decision: either keep dummy behaviour, OR require registry explicitly.
-        return _dummy_run(spec)
 
     try:
         plugin = registry.get(spec.plugin_key)
-    except PluginNotFoundError as e:
-        raise RegistryNotConfiguredError(f"Plugin not found: {spec.plugin_key}") from e
+    except PluginNotFoundError:
+        start = datetime.now(UTC)
+        end = datetime.now(UTC)
+        return RunResult(
+            run_id="not-started",
+            status="failed",
+            started_at_utc=start.isoformat(),
+            ended_at_utc=end.isoformat(),
+            duration_s=(end - start).total_seconds(),
+            outputs={"plugin_key": spec.plugin_key},
+            message=f"Plugin not found: {spec.plugin_key}",
+        )
 
-    run_id = uuid4().hex
-    artifact_dir = Path.cwd() / "artifacts" / "runs" / run_id
-    logger = logging.getLogger(f"ml_harness.run.{run_id}")
-    context = RunContext(
-        run_id=run_id,
-        spec=spec,
-        tracking=_NoopTrackingClient(),
-        artifact_dir=artifact_dir,
-        logger=logger,
-    )
-    # TODO: Replace with real tracking + artifact dir lifecycle in orchestration layer.
-    return plugin.run(spec, context=context)
-
-
-def _dummy_run(spec: RunSpec) -> RunResult:
-    # In real v1, this becomes: resolve plugin -> orchestrator lifecycle -> mlflow logging -> report artifact.
+    tracking_client = tracking or FakeTrackingClient()
+    run_name = spec.short_name()
+    tags = _build_run_tags(spec, plugin)
     start = datetime.now(UTC)
+    try:
+        run_id = tracking_client.start_run(run_name=run_name, tags=tags)
+    except Exception as exc:
+        end = datetime.now(UTC)
+        return RunResult(
+            run_id="not-started",
+            status="failed",
+            started_at_utc=start.isoformat(),
+            ended_at_utc=end.isoformat(),
+            duration_s=(end - start).total_seconds(),
+            outputs={"plugin_key": spec.plugin_key},
+            message=f"Tracking start failed: {exc}",
+        )
 
-    # Pretend we did some work:
-    # - resolved dataset_id (either used existing or "built" one)
-    # - produced a model URI (or just a placeholder)
-    resolved_dataset_id = spec.dataset_id or f"ds_{uuid4().hex[:10]}"
-    run_id = uuid4().hex
+    end_status: RunStatus = "failed"
+    result: RunResult | None = None
+    artifact_dir: Path | None = None
 
-    # lightweight outputs that look like the real system will later
-    outputs = {
-        "plugin_key": spec.plugin_key,
-        "pipeline": spec.pipeline,
-        "run_mode": spec.run_mode,
-        "dataset_id": resolved_dataset_id,
-        "echo_spec": asdict(spec),
-        "artifacts": {
-            "run_report": f"runs/{run_id}/run_report.json",
-        },
-    }
+    try:
+        artifact_dir = build_run_artifact_dir(run_id)
+        logger = logging.getLogger(f"ml_harness.run.{run_id}")
+        context = RunContext(
+            run_id=run_id,
+            spec=spec,
+            tracking=tracking_client,
+            artifact_dir=artifact_dir,
+            logger=logger,
+        )
 
-    end = datetime.now(UTC)
-    duration_s = (end - start).total_seconds()
+        try:
+            plugin_result = plugin.run(spec, context=context)
+        except Exception as exc:
+            end = datetime.now(UTC)
+            duration_s = (end - start).total_seconds()
+            outputs = _merge_outputs(
+                plugin_outputs=None,
+                artifact_dir=artifact_dir,
+                artifact_uri=tracking_client.get_artifact_uri(),
+            )
+            message = str(exc)
+            error_path = artifact_dir / "errors" / "exception.txt"
+            try:
+                _write_exception_artifact(artifact_dir, exc)
+            except Exception:
+                logging.getLogger("ml_harness.run_artifacts").warning(
+                    "Failed to write exception artifact for %s",
+                    run_id,
+                    exc_info=True,
+                )
+            else:
+                _log_artifact_best_effort(
+                    tracking_client,
+                    error_path,
+                    artifact_path="errors",
+                )
+            result = RunResult(
+                run_id=run_id,
+                status="failed",
+                started_at_utc=start.isoformat(),
+                ended_at_utc=end.isoformat(),
+                duration_s=duration_s,
+                outputs=outputs,
+                message=message,
+            )
+            _write_run_summary_best_effort(
+                artifact_dir=artifact_dir,
+                spec=spec,
+                plugin=plugin,
+                run_result=result,
+                tracking_client=tracking_client,
+            )
+            end_status = "failed"
+        else:
+            end = datetime.now(UTC)
+            duration_s = (end - start).total_seconds()
+            outputs = _merge_outputs(
+                plugin_outputs=plugin_result.outputs,
+                artifact_dir=artifact_dir,
+                artifact_uri=tracking_client.get_artifact_uri(),
+            )
+            message = plugin_result.message if plugin_result.message else None
+            result = RunResult(
+                run_id=run_id,
+                status="ok",
+                started_at_utc=start.isoformat(),
+                ended_at_utc=end.isoformat(),
+                duration_s=duration_s,
+                outputs=outputs,
+                message=message,
+            )
+            _write_run_summary_best_effort(
+                artifact_dir=artifact_dir,
+                spec=spec,
+                plugin=plugin,
+                run_result=result,
+                tracking_client=tracking_client,
+            )
+            end_status = "ok"
+    except Exception as exc:
+        end = datetime.now(UTC)
+        outputs: dict[str, object] = {"plugin_key": spec.plugin_key}
+        if artifact_dir is not None:
+            outputs["artifact_dir"] = str(artifact_dir)
+        result = RunResult(
+            run_id=run_id,
+            status="failed",
+            started_at_utc=start.isoformat(),
+            ended_at_utc=end.isoformat(),
+            duration_s=(end - start).total_seconds(),
+            outputs=outputs,
+            message=f"Run failed: {exc}",
+        )
+        end_status = "failed"
+    finally:
+        tracking_client.end_run(status=end_status)
 
-    return RunResult(
-        run_id=run_id,
-        status="ok",
-        started_at_utc=start.isoformat(),
-        ended_at_utc=end.isoformat(),
-        duration_s=duration_s,
-        outputs=outputs,
-        message="Dummy run executed successfully (no real training yet).",
-    )
+    return result
 
 
-class _NoopTrackingClient(TrackingClient):
-    """Tracking client placeholder until orchestration lifecycle is wired."""
+def _build_run_tags(spec: RunSpec, plugin: object) -> dict[str, str]:
+    tags = dict(spec.tags)
+    tags["plugin_key"] = spec.plugin_key
+    tags["pipeline"] = spec.pipeline
+    tags["run_mode"] = spec.run_mode
+    if spec.dataset_id:
+        tags["dataset_id"] = spec.dataset_id
+    if spec.request_id:
+        tags["request_id"] = spec.request_id
+    if spec.seed is not None:
+        tags["seed"] = str(spec.seed)
+    plugin_info = getattr(plugin, "info", None)
+    if plugin_info is not None:
+        tags["plugin_name"] = plugin_info.name
+        tags["plugin_version"] = plugin_info.version
+    return tags
 
-    @property
-    def active_run_id(self) -> str | None:
-        return None
 
-    def start_run(self, *, run_name: str, tags: Mapping[str, str]) -> str:
-        raise RuntimeError("Tracking client not configured.")
+def _merge_outputs(
+    *,
+    plugin_outputs: Mapping[str, object] | None,
+    artifact_dir: Path,
+    artifact_uri: str | None,
+) -> dict[str, object]:
+    outputs: dict[str, object] = dict(plugin_outputs or {})
+    outputs["artifact_dir"] = str(artifact_dir)
+    if artifact_uri is not None:
+        outputs["artifact_uri"] = artifact_uri
+    return outputs
 
-    def end_run(self, *, status: RunStatus) -> None:
-        raise RuntimeError("Tracking client not configured.")
 
-    def log_param(self, key: str, value: object) -> None:
-        raise RuntimeError("Tracking client not configured.")
+def _write_run_summary_best_effort(
+    *,
+    artifact_dir: Path,
+    spec: RunSpec,
+    plugin: object,
+    run_result: RunResult,
+    tracking_client: TrackingClient,
+) -> None:
+    try:
+        summary_path = artifact_dir / "summary" / "run_summary.json"
+        summary_path.parent.mkdir(parents=True, exist_ok=True)
+        plugin_info = getattr(plugin, "info", None)
+        summary = {
+            "run_id": run_result.run_id,
+            "status": run_result.status,
+            "started_at_utc": run_result.started_at_utc,
+            "ended_at_utc": run_result.ended_at_utc,
+            "duration_s": run_result.duration_s,
+            "spec": asdict(spec),
+            "plugin": {
+                "key": plugin_info.key,
+                "name": plugin_info.name,
+                "version": plugin_info.version,
+            }
+            if plugin_info is not None
+            else None,
+            "outputs": dict(run_result.outputs),
+            "message": run_result.message,
+        }
+        with summary_path.open("w", encoding="utf-8") as handle:
+            json.dump(summary, handle, indent=2, sort_keys=True, default=str)
+        _log_artifact_best_effort(
+            tracking_client=tracking_client,
+            local_path=summary_path,
+            artifact_path="summary",
+        )
+    except Exception:
+        logging.getLogger("ml_harness.run_artifacts").warning(
+            "Failed to write run summary for %s",
+            run_result.run_id,
+            exc_info=True,
+        )
 
-    def log_params(self, params: Mapping[str, object]) -> None:
-        raise RuntimeError("Tracking client not configured.")
 
-    def log_metric(self, key: str, value: float, *, step: int | None = None) -> None:
-        raise RuntimeError("Tracking client not configured.")
+def _write_exception_artifact(artifact_dir: Path, exc: Exception) -> None:
+    error_path = artifact_dir / "errors" / "exception.txt"
+    error_path.parent.mkdir(parents=True, exist_ok=True)
+    with error_path.open("w", encoding="utf-8") as handle:
+        handle.write(str(exc))
+        handle.write("\n")
+        handle.write(traceback.format_exc())
 
-    def log_metrics(self, metrics: Mapping[str, float], *, step: int | None = None) -> None:
-        raise RuntimeError("Tracking client not configured.")
 
-    def set_tags(self, tags: Mapping[str, str]) -> None:
-        raise RuntimeError("Tracking client not configured.")
-
-    def log_artifact(self, local_path: str, *, artifact_path: str | None = None) -> None:
-        raise RuntimeError("Tracking client not configured.")
-
-    def log_artifacts(self, local_dir: str, *, artifact_path: str | None = None) -> None:
-        raise RuntimeError("Tracking client not configured.")
-
-    def get_artifact_uri(self) -> str | None:
-        return None
+def _log_artifact_best_effort(
+    tracking_client: TrackingClient,
+    local_path: Path,
+    *,
+    artifact_path: str,
+) -> None:
+    try:
+        tracking_client.log_artifact(str(local_path), artifact_path=artifact_path)
+    except Exception:
+        logging.getLogger("ml_harness.run_artifacts").warning(
+            "Failed to log artifact %s to %s",
+            local_path,
+            artifact_path,
+            exc_info=True,
+        )
