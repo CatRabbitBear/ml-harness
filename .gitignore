@@ -37,6 +37,7 @@ wheels/
 mlruns/
 mlartifacts/
 mlflow.db
+.artifacts/
 
 # --------------------------------------------------
 # Test artifacts
