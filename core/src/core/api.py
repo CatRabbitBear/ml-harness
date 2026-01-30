@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+import logging
+from collections.abc import Mapping
 from dataclasses import asdict
 from datetime import UTC, datetime
+from pathlib import Path
 from uuid import uuid4
 
 from core.contracts import PluginNotFoundError, PluginRegistry, RunResult, RunSpec
+from core.contracts.run_context import RunContext
+from core.contracts.run_result import RunStatus
+from core.contracts.tracking import TrackingClient
 
 
 class SpecValidationError(ValueError):
@@ -45,8 +51,18 @@ def run_pipeline(spec: RunSpec, *, registry: PluginRegistry | None = None) -> Ru
     except PluginNotFoundError as e:
         raise RegistryNotConfiguredError(f"Plugin not found: {spec.plugin_key}") from e
 
-    # context is empty for now; later we’ll add mlflow backend, settings, artifact root, logger etc.
-    return plugin.run(spec, context={})
+    run_id = uuid4().hex
+    artifact_dir = Path.cwd() / "artifacts" / "runs" / run_id
+    logger = logging.getLogger(f"ml_harness.run.{run_id}")
+    context = RunContext(
+        run_id=run_id,
+        spec=spec,
+        tracking=_NoopTrackingClient(),
+        artifact_dir=artifact_dir,
+        logger=logger,
+    )
+    # TODO: Replace with real tracking + artifact dir lifecycle in orchestration layer.
+    return plugin.run(spec, context=context)
 
 
 def _dummy_run(spec: RunSpec) -> RunResult:
@@ -83,3 +99,41 @@ def _dummy_run(spec: RunSpec) -> RunResult:
         outputs=outputs,
         message="Dummy run executed successfully (no real training yet).",
     )
+
+
+class _NoopTrackingClient(TrackingClient):
+    """Tracking client placeholder until orchestration lifecycle is wired."""
+
+    @property
+    def active_run_id(self) -> str | None:
+        return None
+
+    def start_run(self, *, run_name: str, tags: Mapping[str, str]) -> str:
+        raise RuntimeError("Tracking client not configured.")
+
+    def end_run(self, *, status: RunStatus) -> None:
+        raise RuntimeError("Tracking client not configured.")
+
+    def log_param(self, key: str, value: object) -> None:
+        raise RuntimeError("Tracking client not configured.")
+
+    def log_params(self, params: Mapping[str, object]) -> None:
+        raise RuntimeError("Tracking client not configured.")
+
+    def log_metric(self, key: str, value: float, *, step: int | None = None) -> None:
+        raise RuntimeError("Tracking client not configured.")
+
+    def log_metrics(self, metrics: Mapping[str, float], *, step: int | None = None) -> None:
+        raise RuntimeError("Tracking client not configured.")
+
+    def set_tags(self, tags: Mapping[str, str]) -> None:
+        raise RuntimeError("Tracking client not configured.")
+
+    def log_artifact(self, local_path: str, *, artifact_path: str | None = None) -> None:
+        raise RuntimeError("Tracking client not configured.")
+
+    def log_artifacts(self, local_dir: str, *, artifact_path: str | None = None) -> None:
+        raise RuntimeError("Tracking client not configured.")
+
+    def get_artifact_uri(self) -> str | None:
+        return None
