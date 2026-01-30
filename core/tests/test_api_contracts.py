@@ -28,5 +28,6 @@ def test_run_pipeline_returns_failed_when_plugin_missing():
 
     assert isinstance(result, RunResult)
     assert result.status == "failed"
+    assert result.run_id == "not-started"
     assert "Plugin not found" in (result.message or "")
     assert tracking.calls == []

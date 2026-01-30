@@ -10,6 +10,7 @@ from pathlib import Path
 
 from core.contracts import PluginNotFoundError, PluginRegistry, RunResult, RunSpec
 from core.contracts.run_context import RunContext
+from core.contracts.run_result import RunStatus
 from core.contracts.tracking import TrackingClient
 from core.runtime.artifacts import build_run_artifact_dir
 from core.tracking import FakeTrackingClient
@@ -65,88 +66,122 @@ def run_pipeline(
     run_name = spec.short_name()
     tags = _build_run_tags(spec, plugin)
     start = datetime.now(UTC)
-    run_id = tracking_client.start_run(run_name=run_name, tags=tags)
-
-    artifact_dir = build_run_artifact_dir(run_id)
-    logger = logging.getLogger(f"ml_harness.run.{run_id}")
-    context = RunContext(
-        run_id=run_id,
-        spec=spec,
-        tracking=tracking_client,
-        artifact_dir=artifact_dir,
-        logger=logger,
-    )
-
     try:
-        plugin_result = plugin.run(spec, context=context)
+        run_id = tracking_client.start_run(run_name=run_name, tags=tags)
     except Exception as exc:
         end = datetime.now(UTC)
-        duration_s = (end - start).total_seconds()
-        outputs = _merge_outputs(
-            plugin_outputs=None,
-            artifact_dir=artifact_dir,
-            artifact_uri=tracking_client.get_artifact_uri(),
+        return RunResult(
+            run_id="not-started",
+            status="failed",
+            started_at_utc=start.isoformat(),
+            ended_at_utc=end.isoformat(),
+            duration_s=(end - start).total_seconds(),
+            outputs={"plugin_key": spec.plugin_key},
+            message=f"Tracking start failed: {exc}",
         )
-        message = str(exc)
-        error_path = artifact_dir / "errors" / "exception.txt"
+
+    end_status: RunStatus = "failed"
+    result: RunResult | None = None
+    artifact_dir: Path | None = None
+
+    try:
+        artifact_dir = build_run_artifact_dir(run_id)
+        logger = logging.getLogger(f"ml_harness.run.{run_id}")
+        context = RunContext(
+            run_id=run_id,
+            spec=spec,
+            tracking=tracking_client,
+            artifact_dir=artifact_dir,
+            logger=logger,
+        )
+
         try:
-            _write_exception_artifact(artifact_dir, exc)
-        except Exception:
-            logging.getLogger("ml_harness.run_artifacts").warning(
-                "Failed to write exception artifact for %s",
-                run_id,
-                exc_info=True,
+            plugin_result = plugin.run(spec, context=context)
+        except Exception as exc:
+            end = datetime.now(UTC)
+            duration_s = (end - start).total_seconds()
+            outputs = _merge_outputs(
+                plugin_outputs=None,
+                artifact_dir=artifact_dir,
+                artifact_uri=tracking_client.get_artifact_uri(),
             )
+            message = str(exc)
+            error_path = artifact_dir / "errors" / "exception.txt"
+            try:
+                _write_exception_artifact(artifact_dir, exc)
+            except Exception:
+                logging.getLogger("ml_harness.run_artifacts").warning(
+                    "Failed to write exception artifact for %s",
+                    run_id,
+                    exc_info=True,
+                )
+            else:
+                _log_artifact_best_effort(
+                    tracking_client,
+                    error_path,
+                    artifact_path="errors",
+                )
+            result = RunResult(
+                run_id=run_id,
+                status="failed",
+                started_at_utc=start.isoformat(),
+                ended_at_utc=end.isoformat(),
+                duration_s=duration_s,
+                outputs=outputs,
+                message=message,
+            )
+            _write_run_summary_best_effort(
+                artifact_dir=artifact_dir,
+                spec=spec,
+                plugin=plugin,
+                run_result=result,
+                tracking_client=tracking_client,
+            )
+            end_status = "failed"
         else:
-            _log_artifact_best_effort(
-                tracking_client,
-                error_path,
-                artifact_path="errors",
+            end = datetime.now(UTC)
+            duration_s = (end - start).total_seconds()
+            outputs = _merge_outputs(
+                plugin_outputs=plugin_result.outputs,
+                artifact_dir=artifact_dir,
+                artifact_uri=tracking_client.get_artifact_uri(),
             )
+            message = plugin_result.message if plugin_result.message else None
+            result = RunResult(
+                run_id=run_id,
+                status="ok",
+                started_at_utc=start.isoformat(),
+                ended_at_utc=end.isoformat(),
+                duration_s=duration_s,
+                outputs=outputs,
+                message=message,
+            )
+            _write_run_summary_best_effort(
+                artifact_dir=artifact_dir,
+                spec=spec,
+                plugin=plugin,
+                run_result=result,
+                tracking_client=tracking_client,
+            )
+            end_status = "ok"
+    except Exception as exc:
+        end = datetime.now(UTC)
+        outputs: dict[str, object] = {"plugin_key": spec.plugin_key}
+        if artifact_dir is not None:
+            outputs["artifact_dir"] = str(artifact_dir)
         result = RunResult(
             run_id=run_id,
             status="failed",
             started_at_utc=start.isoformat(),
             ended_at_utc=end.isoformat(),
-            duration_s=duration_s,
+            duration_s=(end - start).total_seconds(),
             outputs=outputs,
-            message=message,
+            message=f"Run failed: {exc}",
         )
-        _write_run_summary_best_effort(
-            artifact_dir=artifact_dir,
-            spec=spec,
-            plugin=plugin,
-            run_result=result,
-            tracking_client=tracking_client,
-        )
-        tracking_client.end_run(status="failed")
-        return result
+        end_status = "failed"
+    finally:
+        tracking_client.end_run(status=end_status)
 
-    end = datetime.now(UTC)
-    duration_s = (end - start).total_seconds()
-    outputs = _merge_outputs(
-        plugin_outputs=plugin_result.outputs,
-        artifact_dir=artifact_dir,
-        artifact_uri=tracking_client.get_artifact_uri(),
-    )
-    message = plugin_result.message if plugin_result.message else None
-    result = RunResult(
-        run_id=run_id,
-        status="ok",
-        started_at_utc=start.isoformat(),
-        ended_at_utc=end.isoformat(),
-        duration_s=duration_s,
-        outputs=outputs,
-        message=message,
-    )
-    _write_run_summary_best_effort(
-        artifact_dir=artifact_dir,
-        spec=spec,
-        plugin=plugin,
-        run_result=result,
-        tracking_client=tracking_client,
-    )
-    tracking_client.end_run(status="ok")
     return result
 
 

@@ -36,6 +36,21 @@ class _FailingPlugin:
         raise ValueError("boom")
 
 
+class _FailingTrackingClient:
+    def __init__(self) -> None:
+        self.end_called = False
+
+    @property
+    def active_run_id(self) -> str | None:
+        return None
+
+    def start_run(self, *, run_name: str, tags: dict[str, str]) -> str:
+        raise RuntimeError("start failed")
+
+    def end_run(self, *, status: str) -> None:
+        self.end_called = True
+
+
 def test_run_pipeline_success_tracks_and_writes_summary(tmp_path, monkeypatch):
     monkeypatch.setenv("CORE_ARTIFACT_ROOT", str(tmp_path))
     tracking = FakeTrackingClient(base_artifact_uri="file:///artifacts")
@@ -70,5 +85,18 @@ def test_run_pipeline_failure_writes_exception_and_ends_failed(tmp_path, monkeyp
     assert result.status == "failed"
     expected_dir = tmp_path / "runs" / "run_1"
     assert (expected_dir / "errors" / "exception.txt").exists()
+    assert (expected_dir / "summary" / "run_summary.json").exists()
     assert [call.name for call in tracking.calls].count("end_run") == 1
     assert tracking.calls[-1].kwargs["status"] == "failed"
+
+
+def test_run_pipeline_tracking_start_failure_returns_failed():
+    tracking = _FailingTrackingClient()
+    registry = DictPluginRegistry(plugins={"capture": _CapturingPlugin()})
+    spec = RunSpec(plugin_key="capture", dataset_id="ds_1")
+
+    result = run_pipeline(spec, registry=registry, tracking=tracking)
+
+    assert result.status == "failed"
+    assert result.run_id == "not-started"
+    assert tracking.end_called is False
