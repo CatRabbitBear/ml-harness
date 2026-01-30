@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
+from core.contracts.run_context import RunContext
 from core.contracts.run_result import RunResult
 from core.contracts.run_spec import RunSpec
 
@@ -27,11 +27,10 @@ class Plugin(Protocol):
     @property
     def info(self) -> PluginInfo: ...
 
-    def run(self, spec: RunSpec, *, context: Mapping[str, Any]) -> RunResult:
+    def run(self, spec: RunSpec, *, context: RunContext) -> RunResult:
         """
         Execute the plugin for the given spec.
 
-        `context` is reserved for core-provided services (mlflow backend, settings, artifact root, etc.)
-        but kept untyped for v1 to avoid coupling / bikeshedding.
+        `context` is the stable contract for core-provided services.
         """
         ...

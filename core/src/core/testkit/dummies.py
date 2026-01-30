@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from core.contracts import Plugin, PluginInfo, RunResult, RunSpec
+from core.contracts.run_context import RunContext
 
 
 class DummyPlugin(Plugin):
@@ -8,7 +9,7 @@ class DummyPlugin(Plugin):
     def info(self) -> PluginInfo:
         return PluginInfo(key="dummy", name="Dummy Plugin", version="0.1.0")
 
-    def run(self, spec: RunSpec, *, context):
+    def run(self, spec: RunSpec, *, context: RunContext) -> RunResult:
         return RunResult(
             run_id="dummy-run",
             status="ok",

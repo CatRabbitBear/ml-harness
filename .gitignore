@@ -15,6 +15,7 @@ wheels/
 *.egg-info/
 *.egg
 .ruff_cache/
+.mypy_cache/
 
 # --------------------------------------------------
 # Virtual environments (uv manages envs implicitly)
