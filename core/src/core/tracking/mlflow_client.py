@@ -63,7 +63,7 @@ class MlflowTrackingClient:
     def end_run(self, *, status: RunStatus) -> None:
         """End the active MLflow run."""
         self._ensure_active_run()
-        self._mlflow.end_run(status=status)
+        self._mlflow.end_run(status=_map_run_status(status))
         self._active_run_id = None
 
     def log_param(self, key: str, value: Any) -> None:
@@ -114,3 +114,12 @@ class MlflowTrackingClient:
     def _ensure_no_active_run(self) -> None:
         if self._active_run_id is not None or self._mlflow.active_run() is not None:
             raise RuntimeError("An MLflow run is already active.")
+
+
+def _map_run_status(status: RunStatus) -> str:
+    mapping = {
+        "ok": "FINISHED",
+        "failed": "FAILED",
+        "skipped": "KILLED",
+    }
+    return mapping[status]
