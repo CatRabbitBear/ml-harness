@@ -17,6 +17,8 @@ mlflow = [
 sklearn = [
     "numpy>=2.4.1",
     "scikit-learn>=1.8.0",
+    "joblib>=1.4.2",
+    "matplotlib>=3.9.0",
 ]
 data = [
     "pandas>=2.3.3",

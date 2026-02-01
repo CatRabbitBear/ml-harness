@@ -1242,6 +1242,8 @@ mlflow = [
     { name = "mlflow" },
 ]
 sklearn = [
+    { name = "joblib" },
+    { name = "matplotlib" },
     { name = "numpy" },
     { name = "scikit-learn" },
 ]
@@ -1258,6 +1260,8 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "hmmlearn", marker = "extra == 'hmm'", specifier = ">=0.3.3" },
+    { name = "joblib", marker = "extra == 'sklearn'", specifier = ">=1.4.2" },
+    { name = "matplotlib", marker = "extra == 'sklearn'", specifier = ">=3.9.0" },
     { name = "mlflow", marker = "extra == 'mlflow'", specifier = ">=3.8.1" },
     { name = "numpy", marker = "extra == 'hmm'", specifier = ">=2.4.1" },
     { name = "numpy", marker = "extra == 'sklearn'", specifier = ">=2.4.1" },
