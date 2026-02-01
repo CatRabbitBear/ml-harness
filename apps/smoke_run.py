@@ -5,8 +5,8 @@ import os
 from core.api import run_pipeline
 from core.contracts import RunSpec
 from core.orchestration.registry import DictPluginRegistry
-from core.tracking.mlflow_client import MlflowTrackingClient
 from plugins.smoke_test import SmokeTestPlugin
+from tracking_clients import MlflowTrackingClient
 
 
 def _resolve_tracking_uri() -> str:

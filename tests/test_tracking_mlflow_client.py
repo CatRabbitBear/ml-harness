@@ -3,7 +3,7 @@ import sys
 
 import pytest
 
-from core.tracking import mlflow_client
+from tracking_clients.mlflow_clients import mlflow_client
 
 
 class _FakeRunInfo:

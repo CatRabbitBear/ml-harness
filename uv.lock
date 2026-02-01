@@ -1224,15 +1224,25 @@ name = "ml-harness"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "hmmlearn" },
-    { name = "mlflow" },
-    { name = "numpy" },
-    { name = "pandas" },
-    { name = "pyarrow" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
-    { name = "python-dotenv" },
     { name = "rich" },
+]
+
+[package.optional-dependencies]
+data = [
+    { name = "pandas" },
+    { name = "pyarrow" },
+]
+hmm = [
+    { name = "hmmlearn" },
+    { name = "numpy" },
+]
+mlflow = [
+    { name = "mlflow" },
+]
+sklearn = [
+    { name = "numpy" },
     { name = "scikit-learn" },
 ]
 
@@ -1247,17 +1257,18 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "hmmlearn", specifier = ">=0.3.3" },
-    { name = "mlflow", specifier = ">=3.8.1" },
-    { name = "numpy", specifier = ">=2.4.1" },
-    { name = "pandas", specifier = ">=2.3.3" },
-    { name = "pyarrow", specifier = ">=22.0.0" },
+    { name = "hmmlearn", marker = "extra == 'hmm'", specifier = ">=0.3.3" },
+    { name = "mlflow", marker = "extra == 'mlflow'", specifier = ">=3.8.1" },
+    { name = "numpy", marker = "extra == 'hmm'", specifier = ">=2.4.1" },
+    { name = "numpy", marker = "extra == 'sklearn'", specifier = ">=2.4.1" },
+    { name = "pandas", marker = "extra == 'data'", specifier = ">=2.3.3" },
+    { name = "pyarrow", marker = "extra == 'data'", specifier = ">=22.0.0" },
     { name = "pydantic", specifier = ">=2.12.5" },
     { name = "pydantic-settings", specifier = ">=2.12.0" },
-    { name = "python-dotenv", specifier = ">=1.2.1" },
     { name = "rich", specifier = ">=14.3.1" },
-    { name = "scikit-learn", specifier = ">=1.8.0" },
+    { name = "scikit-learn", marker = "extra == 'sklearn'", specifier = ">=1.8.0" },
 ]
+provides-extras = ["mlflow", "sklearn", "data", "hmm"]
 
 [package.metadata.requires-dev]
 dev = [

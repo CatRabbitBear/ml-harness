@@ -70,6 +70,7 @@ Milestone 3 formalises the use of environment variables for:
 * future credentials (e.g. API keys), without hardcoding them into code or specs
 
 Environment variables are treated as **deployment / execution concerns**, not plugin configuration.
+Core must **not** load `.env` at runtime; dotenv usage is limited to packaging and developer ergonomics only.
 
 ---
 
