@@ -25,6 +25,7 @@ wheels/
 .env/
 .env.*
 .env
+.env.docker
 !.env.example
 
 # --------------------------------------------------

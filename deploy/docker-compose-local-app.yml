@@ -3,10 +3,8 @@ version: "3.9"
 services:
   postgres:
     image: postgres:16
-    environment:
-      POSTGRES_DB: mlflow
-      POSTGRES_USER: mlflow
-      POSTGRES_PASSWORD: mlflow
+    env-file:
+      - deploy/.env.docker
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -39,21 +37,6 @@ services:
         condition: service_healthy
     ports:
       - "5000:5000"
-    volumes:
-      - mlflow_artifacts:/shared/artifacts
-
-  app:
-    build:
-      context: ..
-      dockerfile: deploy/Dockerfile.app
-    command: ["python", "-m", "apps.smoke_run"]
-    environment:
-      CORE_ARTIFACT_ROOT: /shared/artifacts
-      MLFLOW_TRACKING_URI: http://mlflow:5000
-      MLFLOW_EXPERIMENT: ml-harness-dev
-    depends_on:
-      mlflow:
-        condition: service_started
     volumes:
       - mlflow_artifacts:/shared/artifacts
 
