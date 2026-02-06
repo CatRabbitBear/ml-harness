@@ -5,7 +5,7 @@ import os
 from core.api import run_pipeline
 from core.contracts import RunSpec
 from core.orchestration.registry import DictPluginRegistry
-from plugins.smoke_test import SmokeTestPlugin
+from plugins.iris_classification import IrisClassificationPlugin
 from tracking_clients import MlflowTrackingClient
 
 
@@ -19,16 +19,19 @@ def _resolve_experiment_name() -> str:
 
 
 def main() -> None:
-    registry = DictPluginRegistry(plugins={"smoke.test": SmokeTestPlugin()})
+    registry = DictPluginRegistry(
+        plugins={"sklearn.iris_classification": IrisClassificationPlugin()}
+    )
     tracking = MlflowTrackingClient(
         tracking_uri=_resolve_tracking_uri(),
         experiment_name=_resolve_experiment_name(),
     )
 
     spec = RunSpec(
-        plugin_key="smoke.test",
-        data_spec={"smoke": True},
-        tags={"purpose": "smoke"},
+        plugin_key="sklearn.iris_classification",
+        dataset_id="sklearn:iris",
+        data_spec={},
+        tags={"purpose": "realdata"},
     )
 
     result = run_pipeline(spec, registry=registry, tracking=tracking)

@@ -21,8 +21,11 @@ wheels/
 # Virtual environments (uv manages envs implicitly)
 # --------------------------------------------------
 .venv/
+.venv-core/
 .env/
 .env.*
+.env
+.env.docker
 !.env.example
 
 # --------------------------------------------------

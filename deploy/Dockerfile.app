@@ -7,6 +7,6 @@ WORKDIR /app
 
 COPY . /app
 
-RUN pip install --no-cache-dir -e .
+RUN pip install --no-cache-dir -e ".[mlflow]"
 
 CMD ["python", "-m", "apps.smoke_run"]
