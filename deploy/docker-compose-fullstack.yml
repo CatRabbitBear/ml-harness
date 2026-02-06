@@ -3,8 +3,8 @@ version: "3.9"
 services:
   postgres:
     image: postgres:16
-    env-file:
-      - deploy/.env.docker
+    env_file:
+      - .env.docker
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -45,8 +45,8 @@ services:
       context: ..
       dockerfile: deploy/Dockerfile.app
     command: ["python", "-m", "apps.smoke_run"]
-    env-file:
-      - deploy/.env.docker
+    env_file:
+      - .env.docker
     depends_on:
       mlflow:
         condition: service_started

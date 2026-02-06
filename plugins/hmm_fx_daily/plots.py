@@ -16,6 +16,8 @@ def plot_regime_overlay(
     states: np.ndarray,
     max_posterior: np.ndarray | None,
 ) -> Path:
+    dates = _coerce_dates(dates)
+
     fig, ax = plt.subplots(figsize=(12, 4))
     ax.plot(dates, proxy, color="black", linewidth=1.0, label="proxy")
 
@@ -66,6 +68,7 @@ def plot_state_occupancy_rolling(
     n_components: int,
     window: int = 126,
 ) -> Path:
+    dates = _coerce_dates(dates)
     fig, ax = plt.subplots(figsize=(12, 4))
     state_series = pd.Series(states, index=dates)
     for state in range(n_components):
@@ -156,3 +159,11 @@ def _state_segments(states: np.ndarray) -> list[tuple[int, int, int]]:
 def _state_colors(n: int) -> list[str]:
     cmap = plt.get_cmap("tab10")
     return [cmap(i % 10) for i in range(n)]
+
+
+def _coerce_dates(dates: pd.Series | pd.DatetimeIndex | Iterable) -> pd.Series:
+    if isinstance(dates, pd.Series):
+        return dates
+    if isinstance(dates, pd.DatetimeIndex):
+        return dates.to_series(index=dates)
+    return pd.to_datetime(pd.Series(dates), utc=True)

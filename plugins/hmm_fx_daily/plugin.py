@@ -423,8 +423,13 @@ def _build_state_timeseries(
     feature_df: pd.DataFrame,
     feature_cols: list[str],
 ) -> pd.DataFrame:
+    if isinstance(dates, pd.DatetimeIndex):
+        date_values = dates.strftime("%Y-%m-%d")
+    else:
+        date_values = pd.to_datetime(dates, utc=True).dt.strftime("%Y-%m-%d")
+
     payload = {
-        "date": dates.dt.strftime("%Y-%m-%d"),
+        "date": date_values,
         "state": states,
         "max_posterior": max_posterior,
         "entropy": entropy,
