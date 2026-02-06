@@ -43,3 +43,41 @@ def load_dataset(config: DataConfig) -> HmmDataset:
         target_cols=target_cols,
         index_col=loaded.index_col,
     )
+
+
+def get_feature_frame(dataset: HmmDataset) -> pd.DataFrame:
+    df = dataset.loaded.df
+    if df is None or df.empty:
+        raise ValueError("Dataset dataframe is empty; cannot build feature matrix.")
+
+    if not dataset.feature_cols:
+        raise ValueError("No feature columns defined in roles.json.")
+
+    missing = [c for c in dataset.feature_cols if c not in df.columns]
+    if missing:
+        raise ValueError(f"Feature columns missing from dataframe: {missing}")
+
+    feature_df = df.loc[:, dataset.feature_cols].copy()
+    feature_df = feature_df.astype("float64")
+    return feature_df
+
+
+def get_time_index(dataset: HmmDataset) -> pd.Series:
+    import pandas as pd
+
+    df = dataset.loaded.df
+    if df is None or df.empty:
+        raise ValueError("Dataset dataframe is empty; cannot build time index.")
+
+    index_col = dataset.index_col
+    if index_col in df.columns:
+        series = pd.to_datetime(df[index_col], utc=True, errors="coerce")
+    else:
+        if df.index.name != index_col:
+            raise ValueError(f"Index column '{index_col}' not found in dataframe columns or index.")
+        series = pd.to_datetime(df.index, utc=True, errors="coerce")
+
+    if series.isna().any():
+        raise ValueError("Time index contains NaT values after parsing.")
+
+    return series
