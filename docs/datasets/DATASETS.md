@@ -1,15 +1,3 @@
-Below is a **clean, commit-ready `docs/DATASETS.md`** that:
-
-- keeps scope intentionally small (v0)
-- makes the “hard edge” explicit
-- avoids framework adapters
-- avoids data-science pipeline creep
-- is clear enough that Codex (and future-you) won’t drift it
-
-You can drop this straight into the repo.
-
----
-
 # Dataset Support (v0)
 
 ## Purpose

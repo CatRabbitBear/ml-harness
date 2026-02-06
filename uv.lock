@@ -1241,6 +1241,9 @@ hmm = [
 mlflow = [
     { name = "mlflow" },
 ]
+mlh-data = [
+    { name = "mlh-dataset-spec" },
+]
 sklearn = [
     { name = "joblib" },
     { name = "matplotlib" },
@@ -1263,6 +1266,7 @@ requires-dist = [
     { name = "joblib", marker = "extra == 'sklearn'", specifier = ">=1.4.2" },
     { name = "matplotlib", marker = "extra == 'sklearn'", specifier = ">=3.9.0" },
     { name = "mlflow", marker = "extra == 'mlflow'", specifier = ">=3.8.1" },
+    { name = "mlh-dataset-spec", marker = "extra == 'mlh-data'", git = "https://github.com/CatRabbitBear/mlh-dataset-spec.git?rev=v0.1.0" },
     { name = "numpy", marker = "extra == 'hmm'", specifier = ">=2.4.1" },
     { name = "numpy", marker = "extra == 'sklearn'", specifier = ">=2.4.1" },
     { name = "pandas", marker = "extra == 'data'", specifier = ">=2.3.3" },
@@ -1272,7 +1276,7 @@ requires-dist = [
     { name = "rich", specifier = ">=14.3.1" },
     { name = "scikit-learn", marker = "extra == 'sklearn'", specifier = ">=1.8.0" },
 ]
-provides-extras = ["mlflow", "sklearn", "data", "hmm"]
+provides-extras = ["mlflow", "sklearn", "data", "hmm", "mlh-data"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1359,6 +1363,17 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/52/e5/9cdca5a91afd71e15943f3dbe00e788bd36479637e9b2e0625224027ff01/mlflow_tracing-3.8.1.tar.gz", hash = "sha256:c032ba715994a4580323f3045fa2700a6323033d87e564bbcbda37e6ab993071", size = 1130700, upload-time = "2025-12-26T16:31:39.314Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/fd/e3/ddbe3e2d1219fa9235559ab88ebf98e1e4f48c62672f0dfb8f1eb07276dc/mlflow_tracing-3.8.1-py3-none-any.whl", hash = "sha256:12d9b5b7177b4152979d003e0d967b280c4252758639aebdfd672734283b17bf", size = 1359007, upload-time = "2025-12-26T16:31:37.514Z" },
+]
+
+[[package]]
+name = "mlh-dataset-spec"
+version = "0.1.0"
+source = { git = "https://github.com/CatRabbitBear/mlh-dataset-spec.git?rev=v0.1.0#017e2f73a13f226f3c17672da6442847a518e111" }
+dependencies = [
+    { name = "pandas" },
+    { name = "pyarrow" },
+    { name = "pydantic" },
+    { name = "python-dateutil" },
 ]
 
 [[package]]
