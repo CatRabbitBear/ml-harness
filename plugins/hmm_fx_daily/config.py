@@ -124,8 +124,8 @@ def _parse_optional_int(value: Any) -> int | None:
 def _validate_model(model: ModelConfig) -> None:
     if model.n_components <= 0:
         raise ValueError("model.n_components must be positive")
-    if model.covariance_type != "full":
-        raise ValueError("model.covariance_type must be 'full' in v1")
+    # if model.covariance_type != "full":
+    #     raise ValueError("model.covariance_type must be 'full' in v1")
     if model.transmat_prior_strength < 0:
         raise ValueError("model.transmat_prior_strength must be >= 0")
     if model.transmat_prior_mode not in {"sticky_diag", "uniform", "custom_matrix"}:

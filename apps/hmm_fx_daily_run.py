@@ -34,15 +34,16 @@ def main() -> None:
 
     spec = RunSpec(
         plugin_key="hmm.fx_daily",
-        dataset_id="fx:latent_returns_daily:v6",
+        dataset_id="fx:latent_returns_daily:v7",
         data_spec={
             "data": {
                 "dataset_path": _resolve_dataset_path(),
                 "split_name": "default",
             },
             "model": {
-                "n_components": 4,
-                "transmat_prior_strength": 20.0,
+                "n_components": 2,
+                "covariance_type": "full",
+                "transmat_prior_strength": 50.0,
                 "transmat_prior_mode": "sticky_diag",
             },
             "train": {
@@ -52,7 +53,7 @@ def main() -> None:
                 "init_strategy": "kmeans",
             },
             "preprocess": {
-                "scaler": "standard",
+                "scaler": "robust",
                 "winsorize_vol": False,
             },
             "eval": {

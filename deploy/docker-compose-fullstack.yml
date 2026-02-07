@@ -38,21 +38,20 @@ services:
     ports:
       - "5000:5000"
     volumes:
-      - mlflow_artifacts:/shared/artifacts
+      - ../.artifacts:/shared/artifacts
 
   app:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.app
     command: ["python", "-m", "apps.smoke_run"]
-    env_file:
-      - .env.docker
+    env-file:
+      - deploy/.env.docker
     depends_on:
       mlflow:
         condition: service_started
     volumes:
-      - mlflow_artifacts:/shared/artifacts
+      - ../.artifacts:/shared/artifacts
 
 volumes:
   postgres_data:
-  mlflow_artifacts:

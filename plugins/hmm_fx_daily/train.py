@@ -64,7 +64,7 @@ def fit_best_hmm(
             n_iter=train_cfg.n_iter,
             tol=train_cfg.tol,
             random_state=seed,
-            init_params="stmc",
+            init_params="tmc",
             params="stmc",
             transmat_prior=transmat_prior,
         )
@@ -113,13 +113,24 @@ def _apply_initialization(
     model.means_ = kmeans.cluster_centers_
 
     n_features = X.shape[1]
-    covars = np.zeros((n_components, n_features, n_features), dtype=float)
-    for k in range(n_components):
-        cluster = X[labels == k]
-        if cluster.shape[0] < 2:
-            covars[k] = np.cov(X.T) + np.eye(n_features) * 1e-6
-        else:
-            covars[k] = np.cov(cluster.T) + np.eye(n_features) * 1e-6
-    model.covars_ = covars
+    covariance_type = getattr(model, "covariance_type", "full")
+    if covariance_type == "diag":
+        covars = np.zeros((n_components, n_features), dtype=float)
+        for k in range(n_components):
+            cluster = X[labels == k]
+            if cluster.shape[0] < 2:
+                covars[k] = np.var(X, axis=0) + 1e-6
+            else:
+                covars[k] = np.var(cluster, axis=0) + 1e-6
+        model.covars_ = covars
+    else:
+        covars = np.zeros((n_components, n_features, n_features), dtype=float)
+        for k in range(n_components):
+            cluster = X[labels == k]
+            if cluster.shape[0] < 2:
+                covars[k] = np.cov(X.T) + np.eye(n_features) * 1e-6
+            else:
+                covars[k] = np.cov(cluster.T) + np.eye(n_features) * 1e-6
+        model.covars_ = covars
     model.startprob_ = np.full(n_components, 1.0 / n_components)
-    model.init_params = "st"
+    model.init_params = "t"
