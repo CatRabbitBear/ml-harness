@@ -1,0 +1,80 @@
+name: ml-harness
+
+services:
+  postgres:
+    image: postgres:16
+    env_file: .env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    command: ["server", "/data", "--console-address", ":9001"]
+    env_file: .env
+    ports:
+      - "9000:9000" # S3 API
+      - "9001:9001" # Console UI
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # one-shot init to create bucket (runs once on startup)
+  minio_init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    env_file: .env
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD} &&
+      mc mb -p local/$${MLFLOW_S3_BUCKET} || true &&
+      mc anonymous set none local/$${MLFLOW_S3_BUCKET} || true
+      "
+
+  mlflow:
+    build:
+      context: .
+      dockerfile: Dockerfile.mlflow
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio_init:
+        condition: service_started
+    ports:
+      - "5000:5000"
+    env_file: .env
+    environment:
+      # MLflow → MinIO (S3-compatible) credentials + endpoint
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+
+      # optional, but nice to avoid signature quirks
+      AWS_DEFAULT_REGION: us-east-1
+    command:
+      [
+        "server",
+        "--backend-store-uri",
+        "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "5000",
+        "--serve-artifacts",
+        "--artifacts-destination",
+        "s3://${MLFLOW_S3_BUCKET}",
+      ]
+
+volumes:
+  postgres_data:
+  minio_data:

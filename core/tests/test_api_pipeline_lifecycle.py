@@ -16,6 +16,11 @@ class _CapturingPlugin:
 
     def run(self, spec: RunSpec, *, context) -> RunResult:
         self.context = context
+        plugin_artifact = context.artifact_dir / "plugin" / "captured.txt"
+        plugin_artifact.parent.mkdir(parents=True, exist_ok=True)
+        plugin_artifact.write_text("ok", encoding="utf-8")
+        context.tracking.log_metric("plugin_metric", 1.0)
+        context.tracking.log_artifact(str(plugin_artifact), artifact_path="plugin")
         return RunResult(
             run_id=context.run_id,
             status="ok",
@@ -69,7 +74,13 @@ def test_run_pipeline_success_tracks_and_writes_summary(tmp_path, monkeypatch):
     assert plugin.context.artifact_dir == expected_dir
     assert (expected_dir / "summary" / "run_summary.json").exists()
     assert [call.name for call in tracking.calls].count("start_run") == 1
+    assert [call.name for call in tracking.calls].count("log_metric") == 1
+    assert [call.name for call in tracking.calls].count("log_artifact") == 0
+    assert [call.name for call in tracking.calls].count("log_artifacts") == 1
     assert [call.name for call in tracking.calls].count("end_run") == 1
+    assert tracking.calls[-2].name == "log_artifacts"
+    assert tracking.calls[-2].kwargs["local_dir"] == str(expected_dir)
+    assert tracking.calls[-2].kwargs["artifact_path"] == "run"
     assert tracking.calls[-1].kwargs["status"] == "ok"
 
 
@@ -86,6 +97,10 @@ def test_run_pipeline_failure_writes_exception_and_ends_failed(tmp_path, monkeyp
     expected_dir = tmp_path / "runs" / "run_1"
     assert (expected_dir / "errors" / "exception.txt").exists()
     assert (expected_dir / "summary" / "run_summary.json").exists()
+    assert [call.name for call in tracking.calls].count("log_artifacts") == 1
+    assert tracking.calls[-2].name == "log_artifacts"
+    assert tracking.calls[-2].kwargs["local_dir"] == str(expected_dir)
+    assert tracking.calls[-2].kwargs["artifact_path"] == "run"
     assert [call.name for call in tracking.calls].count("end_run") == 1
     assert tracking.calls[-1].kwargs["status"] == "failed"
 
