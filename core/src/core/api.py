@@ -87,10 +87,11 @@ def run_pipeline(
     try:
         artifact_dir = build_run_artifact_dir(run_id)
         logger = logging.getLogger(f"ml_harness.run.{run_id}")
+        plugin_tracking = _ArtifactDeferredTrackingClient(tracking_client)
         context = RunContext(
             run_id=run_id,
             spec=spec,
-            tracking=tracking_client,
+            tracking=plugin_tracking,
             artifact_dir=artifact_dir,
             logger=logger,
         )
@@ -106,7 +107,6 @@ def run_pipeline(
                 artifact_uri=tracking_client.get_artifact_uri(),
             )
             message = str(exc)
-            error_path = artifact_dir / "errors" / "exception.txt"
             try:
                 _write_exception_artifact(artifact_dir, exc)
             except Exception:
@@ -114,12 +114,6 @@ def run_pipeline(
                     "Failed to write exception artifact for %s",
                     run_id,
                     exc_info=True,
-                )
-            else:
-                _log_artifact_best_effort(
-                    tracking_client,
-                    error_path,
-                    artifact_path="errors",
                 )
             result = RunResult(
                 run_id=run_id,
@@ -135,7 +129,6 @@ def run_pipeline(
                 spec=spec,
                 plugin=plugin,
                 run_result=result,
-                tracking_client=tracking_client,
             )
             end_status = "failed"
         else:
@@ -161,7 +154,6 @@ def run_pipeline(
                 spec=spec,
                 plugin=plugin,
                 run_result=result,
-                tracking_client=tracking_client,
             )
             end_status = "ok"
     except Exception as exc:
@@ -180,6 +172,15 @@ def run_pipeline(
         )
         end_status = "failed"
     finally:
+        if artifact_dir is not None and artifact_dir.exists():
+            try:
+                tracking_client.log_artifacts(str(artifact_dir), artifact_path="run")
+            except Exception:
+                logging.getLogger("ml_harness.run_artifacts").warning(
+                    "Failed to bulk log artifacts for %s",
+                    run_id,
+                    exc_info=True,
+                )
         tracking_client.end_run(status=end_status)
 
     return result
@@ -222,7 +223,6 @@ def _write_run_summary_best_effort(
     spec: RunSpec,
     plugin: object,
     run_result: RunResult,
-    tracking_client: TrackingClient,
 ) -> None:
     try:
         summary_path = artifact_dir / "summary" / "run_summary.json"
@@ -247,11 +247,6 @@ def _write_run_summary_best_effort(
         }
         with summary_path.open("w", encoding="utf-8") as handle:
             json.dump(summary, handle, indent=2, sort_keys=True, default=str)
-        _log_artifact_best_effort(
-            tracking_client=tracking_client,
-            local_path=summary_path,
-            artifact_path="summary",
-        )
     except Exception:
         logging.getLogger("ml_harness.run_artifacts").warning(
             "Failed to write run summary for %s",
@@ -269,18 +264,46 @@ def _write_exception_artifact(artifact_dir: Path, exc: Exception) -> None:
         handle.write(traceback.format_exc())
 
 
-def _log_artifact_best_effort(
-    tracking_client: TrackingClient,
-    local_path: Path,
-    *,
-    artifact_path: str,
-) -> None:
-    try:
-        tracking_client.log_artifact(str(local_path), artifact_path=artifact_path)
-    except Exception:
-        logging.getLogger("ml_harness.run_artifacts").warning(
-            "Failed to log artifact %s to %s",
-            local_path,
-            artifact_path,
-            exc_info=True,
-        )
+class _ArtifactDeferredTrackingClient:
+    """
+    Delegate tracking calls while suppressing plugin-level artifact uploads.
+
+    Artifacts are uploaded once in run_pipeline() finally via bulk log_artifacts.
+    """
+
+    def __init__(self, delegate: TrackingClient) -> None:
+        self._delegate = delegate
+
+    @property
+    def active_run_id(self) -> str | None:
+        return self._delegate.active_run_id
+
+    def start_run(self, *, run_name: str, tags: Mapping[str, str]) -> str:
+        return self._delegate.start_run(run_name=run_name, tags=tags)
+
+    def end_run(self, *, status: RunStatus) -> None:
+        self._delegate.end_run(status=status)
+
+    def log_param(self, key: str, value: object) -> None:
+        self._delegate.log_param(key, value)
+
+    def log_params(self, params: Mapping[str, object]) -> None:
+        self._delegate.log_params(params)
+
+    def log_metric(self, key: str, value: float, *, step: int | None = None) -> None:
+        self._delegate.log_metric(key, value, step=step)
+
+    def log_metrics(self, metrics: Mapping[str, float], *, step: int | None = None) -> None:
+        self._delegate.log_metrics(metrics, step=step)
+
+    def set_tags(self, tags: Mapping[str, str]) -> None:
+        self._delegate.set_tags(tags)
+
+    def log_artifact(self, local_path: str, *, artifact_path: str | None = None) -> None:
+        return None
+
+    def log_artifacts(self, local_dir: str, *, artifact_path: str | None = None) -> None:
+        return None
+
+    def get_artifact_uri(self) -> str | None:
+        return self._delegate.get_artifact_uri()
