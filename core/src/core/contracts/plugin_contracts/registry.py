@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Protocol, runtime_checkable
 
-from core.contracts.plugin import Plugin, PluginInfo
+from core.contracts.plugin_contracts.plugin import Plugin, PluginInfo
 
 
 class PluginNotFoundError(KeyError):

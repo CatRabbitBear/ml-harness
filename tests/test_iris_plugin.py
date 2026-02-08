@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from core.api import run_pipeline
-from core.contracts import RunSpec
+from core.contracts.run_contracts import RunSpec
 from core.orchestration.registry import DictPluginRegistry
 from core.tracking.fakes import FakeTrackingClient
 from plugins.iris_classification import IrisClassificationPlugin

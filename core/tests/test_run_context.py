@@ -1,9 +1,9 @@
 import logging
 
-from core.contracts.plugin import Plugin, PluginInfo
-from core.contracts.run_context import RunContext
-from core.contracts.run_result import RunResult
-from core.contracts.run_spec import RunSpec
+from core.contracts.plugin_contracts.plugin import Plugin, PluginInfo
+from core.contracts.run_contracts.run_context import RunContext
+from core.contracts.run_contracts.run_result import RunResult
+from core.contracts.run_contracts.run_spec import RunSpec
 from core.tracking.fakes import FakeTrackingClient
 
 

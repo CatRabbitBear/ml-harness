@@ -3,9 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
-from core.contracts.run_context import RunContext
-from core.contracts.run_result import RunResult
-from core.contracts.run_spec import RunSpec
+from core.contracts.run_contracts.run_context import RunContext
+from core.contracts.run_contracts.run_result import RunResult
+from core.contracts.run_contracts.run_spec import RunSpec
 
 
 @dataclass(frozen=True, slots=True)

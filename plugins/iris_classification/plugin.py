@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from core.contracts import Plugin, PluginInfo, RunResult, RunSpec
-from core.contracts.run_context import RunContext
+from core.contracts.run_contracts.run_context import RunContext
 
 from .artifacts import (
     write_confusion_matrix_plot,
@@ -106,5 +106,5 @@ def _ensure_dependencies() -> None:
     if missing:
         raise RuntimeError(
             "Missing dependencies for IrisClassificationPlugin: "
-            f"{', '.join(missing)}. Install with `pip install -e \".[sklearn]\"`."
+            f'{", ".join(missing)}. Install with `pip install -e ".[sklearn]"`.'
         )

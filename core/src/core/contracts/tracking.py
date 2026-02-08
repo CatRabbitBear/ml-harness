@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, Protocol, runtime_checkable
 
-from core.contracts.run_result import RunStatus
+from core.contracts.run_contracts.run_result import RunStatus
 
 
 @runtime_checkable

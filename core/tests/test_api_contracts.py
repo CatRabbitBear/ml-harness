@@ -1,7 +1,8 @@
 import pytest
 
 from core.api import SpecValidationError, run_pipeline
-from core.contracts import RunResult, RunSpec
+from core.contracts.run_contracts.run_result import RunResult
+from core.contracts.run_contracts.run_spec import RunSpec
 from core.orchestration.registry import DictPluginRegistry
 from core.testkit.dummies import DummyPlugin
 from core.tracking.fakes import FakeTrackingClient

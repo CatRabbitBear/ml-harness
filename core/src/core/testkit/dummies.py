@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from core.contracts import Plugin, PluginInfo, RunResult, RunSpec
-from core.contracts.run_context import RunContext
+from core.contracts.run_contracts.run_context import RunContext
 
 
 class DummyPlugin(Plugin):

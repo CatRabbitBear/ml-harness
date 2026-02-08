@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
-from core.contracts.run_spec import RunSpec
+from core.contracts.run_contracts.run_spec import RunSpec
 from core.contracts.tracking import TrackingClient
 
 

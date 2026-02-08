@@ -9,8 +9,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from core.contracts import PluginNotFoundError, PluginRegistry, RunResult, RunSpec
-from core.contracts.run_context import RunContext
-from core.contracts.run_result import RunStatus
+from core.contracts.run_contracts.run_context import RunContext
+from core.contracts.run_contracts.run_result import RunStatus
 from core.contracts.tracking import TrackingClient
 from core.runtime.artifacts import build_run_artifact_dir
 from core.tracking import FakeTrackingClient
