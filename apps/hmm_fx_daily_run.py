@@ -36,10 +36,10 @@ def main() -> None:
         plugin_key="hmm.fx_daily",
         dataset_id="fx:latent_returns_daily:v9",
         data_spec={
-            "data": {
-                "dataset_path": _resolve_dataset_path(),
-                "split_name": "default",
-            },
+            "dataset_path": _resolve_dataset_path(),
+            "split_name": "default",
+        },
+        params={
             "model": {
                 "n_components": 3,
                 "covariance_type": "diag",

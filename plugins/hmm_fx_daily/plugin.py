@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -8,8 +7,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from core.contracts import Plugin, PluginInfo, RunResult, RunSpec
-from core.contracts.run_context import RunContext
+from core.contracts import ConfigurablePlugin, Plugin, PluginInfo, RunResult, RunSpec
+from core.contracts.run_contracts.run_context import RunContext
 
 from .artifacts import (
     write_dataset_summary,
@@ -19,7 +18,7 @@ from .artifacts import (
     write_state_timeseries,
     write_transmat,
 )
-from .config import parse_config
+from .config import default_params, parse_config, validate_params
 from .data import get_feature_frame, get_time_index, load_dataset
 from .eval import (
     build_state_summary,
@@ -39,7 +38,7 @@ from .plots import (
 from .train import build_transmat_prior, fit_best_hmm
 
 
-class HmmFxDailyPlugin(Plugin):
+class HmmFxDailyPlugin(Plugin, ConfigurablePlugin):
     @property
     def info(self) -> PluginInfo:
         return PluginInfo(
@@ -54,9 +53,9 @@ class HmmFxDailyPlugin(Plugin):
 
         _ensure_dependencies()
 
-        config = parse_config(spec.data_spec)
+        config = parse_config(spec.data_spec, spec.params, strict=spec.strict)
         train_seed = spec.seed if spec.seed is not None else config.train.random_seed
-        train_cfg = replace(config.train, random_seed=train_seed)
+        train_cfg = config.train.model_copy(update={"random_seed": train_seed})
 
         dataset = load_dataset(config.data)
         feature_df = get_feature_frame(dataset)
@@ -296,6 +295,12 @@ class HmmFxDailyPlugin(Plugin):
             },
             message="HMM trained and artifacts logged.",
         )
+
+    def default_params(self) -> dict[str, Any]:
+        return default_params()
+
+    def validate_params(self, params: dict[str, Any], *, strict: bool = True) -> dict[str, Any]:
+        return validate_params(params, strict=strict)
 
 
 def _ensure_dependencies() -> None:

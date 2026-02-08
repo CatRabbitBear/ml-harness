@@ -3,16 +3,39 @@ from __future__ import annotations
 import json
 import logging
 import traceback
+import uuid
 from collections.abc import Mapping
 from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
-from core.contracts import PluginNotFoundError, PluginRegistry, RunResult, RunSpec
+from core.configuration import (
+    ConfigError,
+    apply_dotpath_overrides,
+    coerce_mapping,
+    deep_merge,
+    dump_yaml,
+    expand_grid_overrides,
+    load_run_config,
+    load_sweep_config,
+    resolve_env_vars,
+    stable_hash,
+    variant_id_from_overrides,
+)
+from core.contracts import (
+    ConfigurablePlugin,
+    PluginNotFoundError,
+    PluginRegistry,
+    RunResult,
+    RunSpec,
+    SweepResult,
+    SweepVariantFailure,
+)
 from core.contracts.run_contracts.run_context import RunContext
 from core.contracts.run_contracts.run_result import RunStatus
 from core.contracts.tracking import TrackingClient
-from core.runtime.artifacts import build_run_artifact_dir
+from core.runtime.artifacts import build_run_artifact_dir, resolve_artifact_root
 from core.tracking import FakeTrackingClient
 
 
@@ -95,6 +118,7 @@ def run_pipeline(
             artifact_dir=artifact_dir,
             logger=logger,
         )
+        _write_resolved_config_best_effort(artifact_dir=artifact_dir, spec=spec)
 
         try:
             plugin_result = plugin.run(spec, context=context)
@@ -186,6 +210,158 @@ def run_pipeline(
     return result
 
 
+def run_from_yaml(
+    base_yaml: str | Path,
+    *,
+    registry: PluginRegistry,
+    tracking: TrackingClient | None = None,
+) -> RunResult:
+    run_config = load_run_config(base_yaml)
+    spec = _build_spec_from_run_config(run_config, registry=registry)
+    return run_pipeline(spec, registry=registry, tracking=tracking)
+
+
+def run_sweep_from_yaml(
+    base_yaml: str | Path,
+    sweep_yaml: str | Path,
+    *,
+    registry: PluginRegistry,
+    tracking: TrackingClient | None = None,
+) -> SweepResult:
+    base_config = load_run_config(base_yaml)
+    sweep_config = load_sweep_config(sweep_yaml)
+    base_payload = base_config.model_dump(mode="python")
+
+    sweep_id = f"sweep-{datetime.now(UTC).strftime('%Y%m%dT%H%M%S')}-{uuid.uuid4().hex[:8]}"
+    started = datetime.now(UTC)
+    results: list[RunResult] = []
+    failures: list[SweepVariantFailure] = []
+    variants_total = 0
+
+    for override_values in expand_grid_overrides(sweep_config.sweep.overrides):
+        variants_total += 1
+        variant_id = variant_id_from_overrides(override_values)
+        try:
+            variant_payload = apply_dotpath_overrides(base_payload, override_values)
+            variant_config = load_run_config_dict(variant_payload)
+            spec = _build_spec_from_run_config(variant_config, registry=registry)
+
+            variant_tags = dict(spec.tags)
+            params_hash = stable_hash(spec.params, length=12)
+            variant_tags["sweep_id"] = sweep_id
+            variant_tags["variant_id"] = variant_id
+            variant_tags["params_hash"] = params_hash
+            variant_tags["variant_summary"] = _format_variant_summary(override_values)
+
+            spec = RunSpec(
+                plugin_key=spec.plugin_key,
+                pipeline=spec.pipeline,
+                run_mode=spec.run_mode,
+                dataset_id=spec.dataset_id,
+                data_spec=spec.data_spec,
+                params=spec.params,
+                seed=spec.seed,
+                strict=spec.strict,
+                tags=variant_tags,
+                notes=spec.notes,
+                request_id=spec.request_id,
+                resolved_config=spec.resolved_config,
+            )
+            results.append(run_pipeline(spec, registry=registry, tracking=tracking))
+        except Exception as exc:
+            failures.append(
+                SweepVariantFailure(
+                    variant_id=variant_id,
+                    overrides=dict(override_values),
+                    error=str(exc),
+                )
+            )
+
+    ended = datetime.now(UTC)
+    summary = {
+        "sweep_id": sweep_id,
+        "started_at_utc": started.isoformat(),
+        "ended_at_utc": ended.isoformat(),
+        "duration_s": (ended - started).total_seconds(),
+        "variant_count": variants_total,
+        "success_count": len(results),
+        "failed_count": len(failures),
+        "results": [asdict(item) for item in results],
+        "failures": [asdict(item) for item in failures],
+    }
+    sweep_summary_path = resolve_artifact_root() / "sweeps" / sweep_id / "sweep_summary.json"
+    sweep_summary_path.parent.mkdir(parents=True, exist_ok=True)
+    with sweep_summary_path.open("w", encoding="utf-8") as handle:
+        json.dump(summary, handle, indent=2, sort_keys=True, default=str)
+
+    return SweepResult(
+        sweep_id=sweep_id,
+        started_at_utc=started.isoformat(),
+        ended_at_utc=ended.isoformat(),
+        duration_s=(ended - started).total_seconds(),
+        results=results,
+        failures=failures,
+        metadata={
+            "variant_count": variants_total,
+            "sweep_summary_path": str(sweep_summary_path),
+        },
+    )
+
+
+def load_run_config_dict(payload: Mapping[str, Any]):
+    from pydantic import ValidationError
+
+    from core.contracts import RunConfig
+
+    try:
+        return RunConfig.model_validate(resolve_env_vars(dict(payload)))
+    except ValidationError as exc:
+        raise ConfigError(f"run config validation failed: {exc}") from exc
+
+
+def _build_spec_from_run_config(run_config: Any, *, registry: PluginRegistry) -> RunSpec:
+    plugin = registry.get(run_config.plugin.key)
+    if not isinstance(plugin, ConfigurablePlugin):
+        raise ConfigError(
+            f"Plugin '{run_config.plugin.key}' does not implement default_params()/validate_params()"
+        )
+
+    defaults = coerce_mapping(plugin.default_params())
+    merged_params = deep_merge(defaults, run_config.params)
+    validated_params = coerce_mapping(
+        plugin.validate_params(merged_params, strict=run_config.run.strict)
+    )
+
+    resolved_payload = {
+        "plugin": run_config.plugin.model_dump(mode="python"),
+        "run": run_config.run.model_dump(mode="python"),
+        "data": run_config.data.model_dump(mode="python", exclude_none=True),
+        "params": validated_params,
+    }
+
+    return RunSpec(
+        plugin_key=run_config.plugin.key,
+        pipeline=run_config.run.pipeline,
+        run_mode=run_config.run.run_mode,
+        dataset_id=run_config.data.dataset_id,
+        data_spec=run_config.data.model_dump(mode="python", exclude_none=True),
+        params=validated_params,
+        seed=run_config.run.seed,
+        strict=run_config.run.strict,
+        tags=dict(run_config.run.tags),
+        notes=run_config.run.notes,
+        request_id=run_config.run.request_id,
+        resolved_config=resolved_payload,
+    )
+
+
+def _format_variant_summary(overrides: Mapping[str, Any]) -> str:
+    tokens = []
+    for key in sorted(overrides.keys()):
+        tokens.append(f"{key}={overrides[key]}")
+    return ",".join(tokens)
+
+
 def _build_run_tags(spec: RunSpec, plugin: object) -> dict[str, str]:
     tags = dict(spec.tags)
     tags["plugin_key"] = spec.plugin_key
@@ -251,6 +427,19 @@ def _write_run_summary_best_effort(
         logging.getLogger("ml_harness.run_artifacts").warning(
             "Failed to write run summary for %s",
             run_result.run_id,
+            exc_info=True,
+        )
+
+
+def _write_resolved_config_best_effort(*, artifact_dir: Path, spec: RunSpec) -> None:
+    if not spec.resolved_config:
+        return
+    try:
+        dump_yaml(artifact_dir / "resolved" / "run_config.yaml", dict(spec.resolved_config))
+    except Exception:
+        logging.getLogger("ml_harness.run_artifacts").warning(
+            "Failed to write resolved config artifact for %s",
+            spec.plugin_key,
             exc_info=True,
         )
 

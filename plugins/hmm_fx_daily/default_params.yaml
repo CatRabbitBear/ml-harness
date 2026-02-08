@@ -1,0 +1,18 @@
+model:
+  n_components: 4
+  covariance_type: full
+  transmat_prior_strength: 20.0
+  transmat_prior_mode: sticky_diag
+  transmat_prior_custom: null
+train:
+  n_init: 5
+  n_iter: 300
+  tol: 0.001
+  init_strategy: kmeans
+  random_seed: null
+preprocess:
+  scaler: standard
+  winsorize_vol: false
+eval:
+  eval_scheme: last_n_days
+  eval_last_n_days: 252

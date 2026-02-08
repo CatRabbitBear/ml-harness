@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from core.contracts import Plugin, PluginInfo, RunResult, RunSpec
-from core.contracts.run_context import RunContext
+from core.contracts.run_contracts.run_context import RunContext
 
 
 class SmokeTestPlugin(Plugin):

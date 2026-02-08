@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 
-from core.contracts import Plugin, PluginInfo, RunResult, RunSpec
+from core.contracts import ConfigurablePlugin, Plugin, PluginInfo, RunResult, RunSpec
 from core.contracts.run_contracts.run_context import RunContext
 
 from .artifacts import (
@@ -11,13 +12,13 @@ from .artifacts import (
     write_metrics,
     write_model,
 )
-from .config import parse_config
+from .config import default_params, parse_config, validate_params
 from .data import load_iris_splits
 from .eval import evaluate_model
 from .train import build_model, fit_model
 
 
-class IrisClassificationPlugin(Plugin):
+class IrisClassificationPlugin(Plugin, ConfigurablePlugin):
     @property
     def info(self) -> PluginInfo:
         return PluginInfo(
@@ -32,7 +33,7 @@ class IrisClassificationPlugin(Plugin):
 
         _ensure_dependencies()
 
-        config = parse_config(spec.data_spec)
+        config = parse_config(spec.params, strict=spec.strict)
         seed = spec.seed
 
         splits = load_iris_splits(split=config.split, seed=seed)
@@ -93,6 +94,12 @@ class IrisClassificationPlugin(Plugin):
                 "model_artifact": "models/model.joblib",
             },
         )
+
+    def default_params(self) -> dict[str, Any]:
+        return default_params()
+
+    def validate_params(self, params: dict[str, Any], *, strict: bool = True) -> dict[str, Any]:
+        return validate_params(params, strict=strict)
 
 
 def _ensure_dependencies() -> None:

@@ -184,3 +184,37 @@ For plugin authors (and automation tools like Codex):
   - the run YAML overrides (or sweep overrides)
 
 This keeps experimentation transparent and sweepable.
+
+---
+
+## Implemented conventions in this repo
+
+Current implementation uses these concrete contracts:
+
+- Core run config model: `core/contracts/run_contracts/run_config.py`
+- Core sweep model: `core/contracts/run_contracts/sweep_config.py`
+- YAML execution APIs:
+  - `run_from_yaml(base_yaml, registry, tracking)`
+  - `run_sweep_from_yaml(base_yaml, sweep_yaml, registry, tracking)`
+- Optional plugin extension for params management:
+  - `core/contracts/plugin_contracts/configurable_plugin.py`
+  - `default_params() -> mapping`
+  - `validate_params(params, strict=True) -> mapping`
+
+Plugin examples:
+
+- `plugins/iris_classification/config.py`
+- `plugins/hmm_fx_daily/config.py`
+- default params YAML examples:
+  - `plugins/iris_classification/default_params.yaml`
+  - `plugins/hmm_fx_daily/default_params.yaml`
+
+Strictness behavior:
+
+- `run.strict: true`: unknown keys fail in plugin `validate_params(...)`
+- `run.strict: false`: known keys are validated and normalized, unknown keys are preserved
+
+Reproducibility artifacts:
+
+- Per run: `resolved/run_config.yaml`, `summary/run_summary.json`
+- Per sweep: `<artifact_root>/sweeps/<sweep_id>/sweep_summary.json`

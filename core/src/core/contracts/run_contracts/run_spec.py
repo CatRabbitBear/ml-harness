@@ -23,14 +23,19 @@ class RunSpec:
     # Data identity / data build intent
     dataset_id: str | None = None
     data_spec: Mapping[str, Any] = field(default_factory=dict)
+    params: Mapping[str, Any] = field(default_factory=dict)
 
     # Reproducibility & semantics
     seed: int | None = None
+    strict: bool = True
     tags: Mapping[str, str] = field(default_factory=dict)
     notes: str | None = None
 
     # Optional: caller can force an idempotency key (useful for schedules)
     request_id: str | None = None
+
+    # Optional resolved config payload for artifact reproducibility.
+    resolved_config: Mapping[str, Any] = field(default_factory=dict)
 
     def short_name(self) -> str:
         """Human-friendly identifier for logs/UI."""

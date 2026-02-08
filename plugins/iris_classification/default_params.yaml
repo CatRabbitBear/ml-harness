@@ -1,0 +1,8 @@
+split:
+  train: 0.7
+  val: 0.15
+  test: 0.15
+model:
+  type: logreg
+  C: 1.0
+  max_iter: 200
