@@ -19,10 +19,13 @@ def _resolve_experiment_name() -> str:
 
 
 def _resolve_dataset_path() -> str:
-    dataset_path = os.environ.get("HMM_DATASET_PATH")
-    if not dataset_path:
-        raise RuntimeError("HMM_DATASET_PATH is not set.")
-    return dataset_path
+    dataset_path = os.environ.get("DATASET_PATH")
+    if dataset_path:
+        return dataset_path
+    fallback = os.environ.get("HMM_DATASET_PATH")
+    if fallback:
+        return fallback
+    raise RuntimeError("DATASET_PATH is not set.")
 
 
 def main() -> None:
@@ -42,8 +45,8 @@ def main() -> None:
         params={
             "model": {
                 "n_components": 3,
-                "covariance_type": "diag",
-                "transmat_prior_strength": 50.0,
+                "covariance_type": "full",
+                "transmat_prior_strength": 250.0,
                 "transmat_prior_mode": "sticky_diag",
             },
             "train": {

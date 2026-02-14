@@ -56,7 +56,7 @@ run:
 
 data:
   dataset_id: fx:latent_returns_daily:v9
-  dataset_path: ${HMM_DATASET_PATH}
+  dataset_path: ${DATASET_PATH}
   split_name: default
 
 params:

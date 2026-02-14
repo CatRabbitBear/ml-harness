@@ -4,7 +4,7 @@ This plugin wires up the dataset + metadata loading pipeline for the
 `latent_returns_daily` registry artifacts using `mlh-data`.
 
 Current status:
-- Loads the dataset from `HMM_DATASET_PATH` (or `data.dataset_path`)
+- Loads the dataset from `DATASET_PATH` (or `data.dataset_path`)
 - Fits a `hmmlearn.GaussianHMM` with configurable hyperparameters
 - Logs metrics, tables, plots, and state time series to MLflow
 - Writes model + scaler artifacts under `models/`
