@@ -1,5 +1,5 @@
 experiment:
-  name: local_base_shift1
+  name: local_lat_hist_abs_gbr
   target_cols: []
   feature_set: A
   model_kind: gbr
@@ -7,3 +7,17 @@ split:
   train_end_date: "2021-12-31"
   val_end_date: "2022-12-31"
   test_end_date: "2024-12-01"
+model:
+  gbr_n_estimators: 300
+  gbr_learning_rate: 0.05
+  gbr_max_depth: 3
+  gbr_min_samples_leaf: 5
+  gbr_subsample: 0.9
+preprocess:
+  log_target: true
+  target_epsilon: 1.0e-8
+eval:
+  top_quantile: 0.2
+plots:
+  enabled: true
+  overlay_years: [2024]

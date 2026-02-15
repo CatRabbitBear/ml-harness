@@ -22,20 +22,46 @@ def _resolve_experiment_name() -> str:
 
 
 def _resolve_dataset_path() -> str:
-    dataset_two = os.environ.get("DATASET_PATH_TWO")
-    if dataset_two:
-        return dataset_two
+    explicit = os.environ.get("FX_LOCAL_DATASET_PATH")
+    if explicit:
+        return explicit
     dataset_one = os.environ.get("DATASET_PATH")
     if dataset_one:
         return dataset_one
+    dataset_two = os.environ.get("DATASET_PATH_TWO")
+    if dataset_two:
+        return dataset_two
     raise RuntimeError("DATASET_PATH_TWO or DATASET_PATH must be set.")
 
 
 def _resolve_experiment_name_override() -> str:
-    return os.environ.get("FX_LOCAL_EXPERIMENT", "local_base_shift1")
+    return os.environ.get("FX_LOCAL_EXPERIMENT", "local_lat_hist_abs_gbr")
+
+
+def _resolve_target_cols() -> list[str]:
+    raw = os.environ.get("FX_LOCAL_TARGET_COLS", "")
+    if not raw.strip():
+        return []
+    return [item.strip() for item in raw.split(",") if item.strip()]
+
+
+def _resolve_feature_set(experiment_name: str) -> str:
+    if "base_" in experiment_name:
+        return "A"
+    if "_features_c_" in experiment_name:
+        return "C"
+    if "_features_b_" in experiment_name:
+        return "B"
+    return "A"
 
 
 def main() -> None:
+    experiment_name = _resolve_experiment_name_override()
+    model_kind = "gbr"
+    if experiment_name == "local_base_shift1":
+        model_kind = "shift1"
+    if experiment_name == "local_base_zero":
+        model_kind = "zero"
     spec = RunSpec(
         plugin_key="fx.local_vol_regression",
         pipeline="train",
@@ -46,10 +72,10 @@ def main() -> None:
         },
         params={
             "experiment": {
-                "name": _resolve_experiment_name_override(),
-                "target_cols": [],
-                "feature_set": "A",
-                "model_kind": "gbr",
+                "name": experiment_name,
+                "target_cols": _resolve_target_cols(),
+                "feature_set": _resolve_feature_set(experiment_name),
+                "model_kind": model_kind,
             }
         },
         strict=True,

@@ -1,0 +1,61 @@
+FX Local Vol Suite Report
+Experiment context: fx_geom_ignite_local
+Source: latest successful run per family + model from .artifacts
+
+Family: latent
+Model: local_base_shift1 (run_id=090cf7bfd4cc47db989f7e33c3d9419c)
+RMSE deltas: avg_test_delta_rmse_vs_zero=-0.164716
+Spearman: avg_test_spearman=0.759699
+TopQ precision: avg_test_topq_precision=0.666667
+Turning F1: avg_test_turn_f1=0.513082
+Calm-global slice metrics: N/A (not logged by current plugin/evaluator)
+
+Model: local_features_a_gbr (run_id=8ebf98ae566f4a178f8e7eeaa19b55f1)
+RMSE deltas: avg_test_delta_rmse_vs_zero=-0.123018
+Spearman: avg_test_spearman=0.738414
+TopQ precision: avg_test_topq_precision=0.666667
+Turning F1: avg_test_turn_f1=0.630344
+Calm-global slice metrics: N/A (not logged by current plugin/evaluator)
+
+Model: local_features_b_gbr (run_id=f27d48783f9141a48a3fdacb797d7634)
+RMSE deltas: avg_test_delta_rmse_vs_zero=-0.125627
+Spearman: avg_test_spearman=0.738598
+TopQ precision: avg_test_topq_precision=0.682292
+Turning F1: avg_test_turn_f1=0.660580
+Calm-global slice metrics: N/A (not logged by current plugin/evaluator)
+
+Model: local_features_c_gbr (run_id=f08cd7714cfd43c6b2a4a39d127afaf3)
+RMSE deltas: avg_test_delta_rmse_vs_zero=-0.123171
+Spearman: avg_test_spearman=0.736682
+TopQ precision: avg_test_topq_precision=0.671875
+Turning F1: avg_test_turn_f1=0.653931
+Calm-global slice metrics: N/A (not logged by current plugin/evaluator)
+
+Family: pca
+Model: local_base_shift1 (run_id=ab29b9d97517481eb1d1ad18f8e68809)
+RMSE deltas: avg_test_delta_rmse_vs_zero=-0.178125
+Spearman: avg_test_spearman=0.786337
+TopQ precision: avg_test_topq_precision=0.729167
+Turning F1: avg_test_turn_f1=0.510870
+Calm-global slice metrics: N/A (not logged by current plugin/evaluator)
+
+Model: local_features_a_gbr (run_id=4f1f950a7ff042ca8a7fe51718cc3312)
+RMSE deltas: avg_test_delta_rmse_vs_zero=-0.127655
+Spearman: avg_test_spearman=0.782491
+TopQ precision: avg_test_topq_precision=0.671875
+Turning F1: avg_test_turn_f1=0.672831
+Calm-global slice metrics: N/A (not logged by current plugin/evaluator)
+
+Model: local_features_b_gbr (run_id=703ad7d07b3545ada3eaed7723ba6274)
+RMSE deltas: avg_test_delta_rmse_vs_zero=-0.129596
+Spearman: avg_test_spearman=0.781429
+TopQ precision: avg_test_topq_precision=0.671875
+Turning F1: avg_test_turn_f1=0.682192
+Calm-global slice metrics: N/A (not logged by current plugin/evaluator)
+
+Model: local_features_c_gbr (run_id=117f475b3ba84846a67b797744ae9dff)
+RMSE deltas: avg_test_delta_rmse_vs_zero=-0.131821
+Spearman: avg_test_spearman=0.784707
+TopQ precision: avg_test_topq_precision=0.661458
+Turning F1: avg_test_turn_f1=0.660588
+Calm-global slice metrics: N/A (not logged by current plugin/evaluator)

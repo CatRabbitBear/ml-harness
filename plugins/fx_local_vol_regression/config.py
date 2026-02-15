@@ -40,13 +40,17 @@ class ExperimentConfig(BaseModel):
             "local_features_a_gbr",
             "local_features_b_gbr",
             "local_features_c_gbr",
+            "local_lat_hist_abs_gbr",
+            "local_lat_hist_signed_gbr",
+            "local_lat_hist_plus_global_gbr",
+            "local_lat_rms_nuanced_gbr",
         }
         if self.name not in allowed:
             raise ValueError(f"Unsupported experiment.name: {self.name}")
         if self.feature_set not in {"A", "B", "C"}:
             raise ValueError("experiment.feature_set must be one of A|B|C")
-        if self.model_kind not in {"gbr"}:
-            raise ValueError("experiment.model_kind currently supports only gbr")
+        if self.model_kind not in {"gbr", "zero", "shift1"}:
+            raise ValueError("experiment.model_kind currently supports gbr|zero|shift1")
         return self
 
 
@@ -58,11 +62,71 @@ class SplitConfig(BaseModel):
     test_end_date: str = "2024-12-01"
 
 
+class ModelConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    gbr_n_estimators: int = 300
+    gbr_learning_rate: float = 0.05
+    gbr_max_depth: int = 3
+    gbr_min_samples_leaf: int = 5
+    gbr_subsample: float = 0.9
+
+    @model_validator(mode="after")
+    def _validate_model(self) -> ModelConfig:
+        if self.gbr_n_estimators <= 0:
+            raise ValueError("model.gbr_n_estimators must be > 0")
+        if self.gbr_learning_rate <= 0:
+            raise ValueError("model.gbr_learning_rate must be > 0")
+        if self.gbr_max_depth <= 0:
+            raise ValueError("model.gbr_max_depth must be > 0")
+        if self.gbr_min_samples_leaf <= 0:
+            raise ValueError("model.gbr_min_samples_leaf must be > 0")
+        if self.gbr_subsample <= 0 or self.gbr_subsample > 1:
+            raise ValueError("model.gbr_subsample must be in (0, 1]")
+        return self
+
+
+class PreprocessConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    log_target: bool = False
+    target_epsilon: float = 1e-8
+
+    @model_validator(mode="after")
+    def _validate_preprocess(self) -> PreprocessConfig:
+        if self.target_epsilon <= 0:
+            raise ValueError("preprocess.target_epsilon must be > 0")
+        return self
+
+
+class EvalConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    top_quantile: float = 0.2
+
+    @model_validator(mode="after")
+    def _validate_eval(self) -> EvalConfig:
+        if self.top_quantile <= 0 or self.top_quantile >= 1:
+            raise ValueError("eval.top_quantile must be in (0, 1)")
+        return self
+
+
+class PlotConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = True
+    overlay_years: list[int] = Field(default_factory=lambda: [2024])
+
+
 class FxLocalVolParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     experiment: ExperimentConfig = Field(default_factory=ExperimentConfig)
     split: SplitConfig = Field(default_factory=SplitConfig)
+    model: ModelConfig = Field(default_factory=ModelConfig)
+    preprocess: PreprocessConfig = Field(default_factory=PreprocessConfig)
+    eval: EvalConfig = Field(default_factory=EvalConfig)
+    plots: PlotConfig = Field(default_factory=PlotConfig)
 
 
 class FxLocalVolConfig(BaseModel):
@@ -71,6 +135,10 @@ class FxLocalVolConfig(BaseModel):
     data: DataConfig
     experiment: ExperimentConfig
     split: SplitConfig
+    model: ModelConfig
+    preprocess: PreprocessConfig
+    eval: EvalConfig
+    plots: PlotConfig
 
 
 def default_params() -> dict[str, Any]:
@@ -109,6 +177,10 @@ def parse_config(
         data=data_cfg,
         experiment=parsed_params.experiment,
         split=parsed_params.split,
+        model=parsed_params.model,
+        preprocess=parsed_params.preprocess,
+        eval=parsed_params.eval,
+        plots=parsed_params.plots,
     )
 
 

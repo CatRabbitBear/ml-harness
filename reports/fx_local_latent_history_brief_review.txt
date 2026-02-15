@@ -1,0 +1,29 @@
+FX Local Latent History Ladder - Brief Review
+Runs reviewed: 2026-02-15 latent-only suite
+Metrics: TEST split, average over targets (excess_ignite10__JPY, excess_ignite5__JPY)
+
+Quick rank by avg RMSE (lower is better):
+1. local_lat_rms_nuanced_gbr (1fe6a7f49f9848e0b5282e9dcbd0ad61) -> 0.4527
+2. local_lat_hist_plus_global_gbr (a525f3cea599426b95f9e2ae189f23a5) -> 0.4700
+3. local_lat_hist_abs_gbr (33816fb4ac79412cb314f2a29a4400f7) -> 0.4746
+4. local_lat_hist_signed_gbr (53c5ddc3a2e641a68ca5373a6c72b426) -> 0.4957
+
+Model: local_lat_rms_nuanced_gbr
+Run ID: 1fe6a7f49f9848e0b5282e9dcbd0ad61
+RMSE / Spearman / top-Q / turning F1: 0.4527 / 0.6637 / 0.5918 / 0.5939
+Per-target: ignite10 -> 0.4016, 0.7274, 0.6122, 0.6294; ignite5 -> 0.5039, 0.6000, 0.5714, 0.5583
+
+Model: local_lat_hist_plus_global_gbr
+Run ID: a525f3cea599426b95f9e2ae189f23a5
+RMSE / Spearman / top-Q / turning F1: 0.4700 / 0.6603 / 0.5918 / 0.5997
+Per-target: ignite10 -> 0.4247, 0.7203, 0.6224, 0.6240; ignite5 -> 0.5153, 0.6002, 0.5612, 0.5755
+
+Model: local_lat_hist_signed_gbr
+Run ID: 53c5ddc3a2e641a68ca5373a6c72b426
+RMSE / Spearman / top-Q / turning F1: 0.4957 / 0.5191 / 0.5102 / 0.6051
+Per-target: ignite10 -> 0.4496, 0.5718, 0.5510, 0.6276; ignite5 -> 0.5417, 0.4664, 0.4694, 0.5825
+
+Model: local_lat_hist_abs_gbr
+Run ID: 33816fb4ac79412cb314f2a29a4400f7
+RMSE / Spearman / top-Q / turning F1: 0.4746 / 0.5837 / 0.5816 / 0.5819
+Per-target: ignite10 -> 0.4242, 0.6446, 0.6327, 0.5906; ignite5 -> 0.5250, 0.5228, 0.5306, 0.5731
