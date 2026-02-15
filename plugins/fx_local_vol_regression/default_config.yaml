@@ -1,0 +1,9 @@
+experiment:
+  name: local_base_shift1
+  target_cols: []
+  feature_set: A
+  model_kind: gbr
+split:
+  train_end_date: "2021-12-31"
+  val_end_date: "2022-12-31"
+  test_end_date: "2024-12-01"

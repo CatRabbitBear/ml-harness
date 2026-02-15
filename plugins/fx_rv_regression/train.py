@@ -12,6 +12,16 @@ from .data import DataFrameSplits
 PCA_COLS = [f"PC{i}" for i in range(1, 7)]
 PCA_ABS_COLS = [f"{c}_abs" for c in PCA_COLS]
 RMS_STATS_COLS = ["rms5__mean", "rms5__std", "rms5__max"]
+LATENT_RET_COLS = [
+    "lat_ret__AUD",
+    "lat_ret__CAD",
+    "lat_ret__CHF",
+    "lat_ret__EUR",
+    "lat_ret__GBP",
+    "lat_ret__JPY",
+    "lat_ret__NZD",
+    "lat_ret__USD",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,6 +55,17 @@ def resolve_experiment_plan(name: str) -> ExperimentPlan:
     if name == "ignite_rms5_stats_gbr":
         return ExperimentPlan(
             name=name, model_kind="gbr", feature_cols=RMS_STATS_COLS, include_abs_pca=False
+        )
+    if name == "ignite_latret8_gbr":
+        return ExperimentPlan(
+            name=name, model_kind="gbr", feature_cols=LATENT_RET_COLS, include_abs_pca=False
+        )
+    if name == "ignite_combo11_gbr":
+        return ExperimentPlan(
+            name=name,
+            model_kind="gbr",
+            feature_cols=LATENT_RET_COLS + RMS_STATS_COLS,
+            include_abs_pca=False,
         )
     if name == "ignite_pca6_gbr":
         return ExperimentPlan(

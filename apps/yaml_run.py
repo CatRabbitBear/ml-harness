@@ -6,6 +6,7 @@ from pathlib import Path
 
 from core.api import run_from_yaml, run_sweep_from_yaml
 from core.orchestration.registry import DictPluginRegistry
+from plugins.fx_local_vol_regression import FxLocalVolRegressionPlugin
 from plugins.fx_rv_regression import FxRvRegressionPlugin
 from plugins.hmm_fx_daily import HmmFxDailyPlugin
 from plugins.iris_classification import IrisClassificationPlugin
@@ -28,6 +29,7 @@ def build_registry() -> DictPluginRegistry:
         "sklearn.iris_classification": IrisClassificationPlugin(),
         "hmm.fx_daily": HmmFxDailyPlugin(),
         "fx.rv_regression": FxRvRegressionPlugin(),
+        "fx.local_vol_regression": FxLocalVolRegressionPlugin(),
     }
     return DictPluginRegistry(plugins=plugins)
 

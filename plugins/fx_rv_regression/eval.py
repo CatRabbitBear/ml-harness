@@ -38,6 +38,9 @@ def evaluate_predictions(
         precision, recall, lift, mean_pred_topq, mean_true_topq = _topq_scores(
             y_true, y_pred, quantile=top_quantile
         )
+        tp_precision, tp_recall, tp_f1, tp_rate_true, tp_rate_pred, delta_sign_acc = (
+            _turning_point_scores(y_true, y_pred)
+        )
 
         mean_pred = float(np.mean(y_pred))
         mean_true = float(np.mean(y_true))
@@ -60,6 +63,12 @@ def evaluate_predictions(
         metrics[f"{split_name}_mean_true"] = mean_true
         metrics[f"{split_name}_mean_error"] = mean_error
         metrics[f"{split_name}_mean_error_topq"] = mean_error_topq
+        metrics[f"{split_name}_turn_precision"] = float(tp_precision)
+        metrics[f"{split_name}_turn_recall"] = float(tp_recall)
+        metrics[f"{split_name}_turn_f1"] = float(tp_f1)
+        metrics[f"{split_name}_turn_rate_true"] = float(tp_rate_true)
+        metrics[f"{split_name}_turn_rate_pred"] = float(tp_rate_pred)
+        metrics[f"{split_name}_delta_sign_acc"] = float(delta_sign_acc)
     return metrics
 
 
@@ -105,3 +114,39 @@ def _topq_scores(
     mean_pred_topq = float(np.mean(y_pred[pred_top])) if np.any(pred_top) else 0.0
     mean_true_topq = float(np.mean(y_true[true_top])) if np.any(true_top) else 0.0
     return precision, recall, lift, mean_pred_topq, mean_true_topq
+
+
+def _turning_point_scores(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+) -> tuple[float, float, float, float, float, float]:
+    n = y_true.size
+    if n < 3:
+        return 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+
+    true_delta = np.diff(y_true)
+    pred_delta = np.diff(y_pred)
+    true_sign = np.sign(true_delta)
+    pred_sign = np.sign(pred_delta)
+
+    # Turning event at t means slope sign changed from t-1 to t.
+    true_turn = true_sign[1:] != true_sign[:-1]
+    pred_turn = pred_sign[1:] != pred_sign[:-1]
+
+    tp = int(np.sum(true_turn & pred_turn))
+    pred_pos = int(np.sum(pred_turn))
+    true_pos = int(np.sum(true_turn))
+
+    precision = float(tp / pred_pos) if pred_pos > 0 else 0.0
+    recall = float(tp / true_pos) if true_pos > 0 else 0.0
+    f1 = float(2 * precision * recall / (precision + recall)) if (precision + recall) > 0 else 0.0
+    rate_true = float(true_pos / true_turn.size) if true_turn.size > 0 else 0.0
+    rate_pred = float(pred_pos / pred_turn.size) if pred_turn.size > 0 else 0.0
+
+    valid = (true_sign != 0) & (pred_sign != 0)
+    if np.any(valid):
+        delta_sign_acc = float(np.mean(true_sign[valid] == pred_sign[valid]))
+    else:
+        delta_sign_acc = 0.0
+
+    return precision, recall, f1, rate_true, rate_pred, delta_sign_acc
