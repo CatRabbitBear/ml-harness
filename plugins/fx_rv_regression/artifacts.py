@@ -64,10 +64,10 @@ def write_model(artifact_dir: Path, *, target_col: str, model: Any) -> Path:
     return path
 
 
-def write_persistence_spec(artifact_dir: Path, *, target_col: str) -> Path:
-    path = artifact_dir / "models" / f"{target_col}_persistence.json"
+def write_baseline_spec(artifact_dir: Path, *, target_col: str, strategy: str) -> Path:
+    path = artifact_dir / "models" / f"{target_col}_{strategy}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {"target_col": target_col, "strategy": "lag1_target"}
+    payload = {"target_col": target_col, "strategy": strategy}
     with path.open("w", encoding="utf-8") as handle:
         json.dump(payload, handle, indent=2, sort_keys=True)
     return path

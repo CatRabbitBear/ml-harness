@@ -44,15 +44,13 @@ def test_fx_default_params_contains_expected_sections() -> None:
 
 def test_fx_validate_params_strict_rejects_unknown_keys() -> None:
     with pytest.raises(ValueError):
-        validate_fx_params(
-            {"experiment": {"name": "rv_regress_v1_persist"}, "unknown": 1}, strict=True
-        )
+        validate_fx_params({"experiment": {"name": "ignite_base_zero"}, "unknown": 1}, strict=True)
 
 
 def test_fx_validate_params_non_strict_preserves_unknown_keys() -> None:
     validated = validate_fx_params(
-        {"experiment": {"name": "rv_regress_v1_persist"}, "x_extra": {"enabled": True}},
+        {"experiment": {"name": "ignite_base_zero"}, "x_extra": {"enabled": True}},
         strict=False,
     )
-    assert validated["experiment"]["name"] == "rv_regress_v1_persist"
+    assert validated["experiment"]["name"] == "ignite_base_zero"
     assert validated["x_extra"]["enabled"] is True

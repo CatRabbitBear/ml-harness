@@ -26,31 +26,18 @@ class DataConfig(BaseModel):
 class ExperimentConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    name: str = "rv_base_persist_shift1"
-    target_cols: list[str] = Field(
-        default_factory=lambda: ["rv_fwd5__mean", "rv_fwd10__mean", "rv_fwd20__mean"]
-    )
+    name: str = "ignite_base_zero"
+    target_cols: list[str] = Field(default_factory=lambda: ["ignite5", "ignite10", "ignite20"])
 
     @model_validator(mode="after")
     def _validate_experiment(self) -> ExperimentConfig:
         allowed = {
-            "rv_base_persist_shift1",
-            "rv_rms5_stats_ridge",
-            "rv_rms5_stats_gbr",
-            "rv_rms5_vec8_ridge",
-            "rv_rms5_vec8_gbr",
-            "rv_pca6_ridge",
-            "rv_pca6_gbr",
-            "rv_pca6_abs12_ridge",
-            "rv_pca6_abs12_gbr",
-            "rv_combo15_ridge",
-            "rv_combo15_gbr",
-            "rv_stress1_ridge",
-            "rv_stress1_gbr",
-            # Backward compatibility aliases.
-            "rv_regress_v1_persist",
-            "rv_regress_v1_pca6abs_ridge",
-            "rv_regress_v1_pca6abs_gbr",
+            "ignite_base_zero",
+            "ignite_base_shift1",
+            "ignite_rms5_stats_gbr",
+            "ignite_pca6_gbr",
+            "ignite_pca6_abs12_gbr",
+            "ignite_combo15_gbr",
         }
         if self.name not in allowed:
             raise ValueError(f"Unsupported experiment.name: {self.name}")
@@ -70,7 +57,6 @@ class SplitConfig(BaseModel):
 class ModelConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    ridge_alpha: float = 1.0
     gbr_n_estimators: int = 300
     gbr_learning_rate: float = 0.05
     gbr_max_depth: int = 3
@@ -79,8 +65,6 @@ class ModelConfig(BaseModel):
 
     @model_validator(mode="after")
     def _validate_model(self) -> ModelConfig:
-        if self.ridge_alpha <= 0:
-            raise ValueError("model.ridge_alpha must be > 0")
         if self.gbr_n_estimators <= 0:
             raise ValueError("model.gbr_n_estimators must be > 0")
         if self.gbr_learning_rate <= 0:
@@ -97,7 +81,7 @@ class ModelConfig(BaseModel):
 class PreprocessConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    log_target: bool = True
+    log_target: bool = False
     target_epsilon: float = 1e-8
 
     @model_validator(mode="after")

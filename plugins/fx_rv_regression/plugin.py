@@ -8,10 +8,10 @@ from core.contracts import ConfigurablePlugin, Plugin, PluginInfo, RunResult, Ru
 from core.contracts.run_contracts.run_context import RunContext
 
 from .artifacts import (
+    write_baseline_spec,
     write_data_summary,
     write_metrics,
     write_model,
-    write_persistence_spec,
     write_predictions,
 )
 from .config import FxRvRegressionConfig, default_params, parse_config, validate_params
@@ -22,7 +22,7 @@ from .train import (
     normalize_experiment_name,
     required_columns_for_experiment,
     run_experiment,
-    run_persistence,
+    run_zero_baseline,
 )
 
 
@@ -33,7 +33,7 @@ class FxRvRegressionPlugin(Plugin, ConfigurablePlugin):
             key="fx.rv_regression",
             name="FX RV Regression",
             version="0.1.0",
-            description="RV regression baselines on FX latent features.",
+            description="Ignition regression baselines on FX geometry features.",
         )
 
     def run(self, spec: RunSpec, *, context: RunContext) -> RunResult:
@@ -55,18 +55,20 @@ class FxRvRegressionPlugin(Plugin, ConfigurablePlugin):
                 predictions_by_split=result.predictions_raw,
                 top_quantile=config.eval.top_quantile,
                 target_epsilon=config.preprocess.target_epsilon,
+                use_log_metrics=config.preprocess.log_target,
             )
-            persistence_preds = run_persistence(result.target_col, splits)
-            persistence_metrics = evaluate_predictions(
-                predictions_by_split=persistence_preds,
+            zero_preds = run_zero_baseline(result.target_col, splits)
+            zero_metrics = evaluate_predictions(
+                predictions_by_split=zero_preds,
                 top_quantile=config.eval.top_quantile,
                 target_epsilon=config.preprocess.target_epsilon,
+                use_log_metrics=config.preprocess.log_target,
             )
-            if result.model_kind != "persistence":
+            if result.model_kind != "zero":
                 metrics.update(
                     compute_test_deltas(
                         model_metrics=metrics,
-                        persistence_metrics=persistence_metrics,
+                        baseline_metrics=zero_metrics,
                     )
                 )
             for key, value in metrics.items():
@@ -88,13 +90,17 @@ class FxRvRegressionPlugin(Plugin, ConfigurablePlugin):
                     top_quantile=config.eval.top_quantile,
                     target_epsilon=config.preprocess.target_epsilon,
                     overlay_years=config.plots.overlay_years,
+                    use_log_space=config.preprocess.log_target,
                 )
                 for plot_path in plot_paths:
                     context.tracking.log_artifact(str(plot_path), artifact_path="plots")
 
-            if result.model_kind == "persistence":
-                model_path = write_persistence_spec(
-                    context.artifact_dir, target_col=result.target_col
+            if result.model_kind in {"zero", "shift1"}:
+                strategy = "const_zero" if result.model_kind == "zero" else "lag1_target"
+                model_path = write_baseline_spec(
+                    context.artifact_dir,
+                    target_col=result.target_col,
+                    strategy=strategy,
                 )
             else:
                 model_path = write_model(
@@ -107,7 +113,7 @@ class FxRvRegressionPlugin(Plugin, ConfigurablePlugin):
         metrics_path = write_metrics(context.artifact_dir, all_metrics)
         summary_path = write_data_summary(
             context.artifact_dir,
-            dataset_id=spec.dataset_id or "fx:rv_regression",
+            dataset_id=spec.dataset_id or "fx:ignite_regression",
             dataset_path=config.data.dataset_path,
             index_col=dataset.index_col,
             row_counts={
@@ -130,6 +136,7 @@ class FxRvRegressionPlugin(Plugin, ConfigurablePlugin):
                 "plugin": self.info.key,
                 "pipeline": spec.pipeline,
                 "experiment_name": canonical_experiment_name,
+                "target_type": "ignite",
             }
         )
         context.tracking.log_params(
@@ -140,7 +147,6 @@ class FxRvRegressionPlugin(Plugin, ConfigurablePlugin):
                 "split.train_end_date": config.split.train_end_date,
                 "split.val_end_date": config.split.val_end_date,
                 "split.test_end_date": config.split.test_end_date,
-                "model.ridge_alpha": config.model.ridge_alpha,
                 "model.gbr_n_estimators": config.model.gbr_n_estimators,
                 "model.gbr_learning_rate": config.model.gbr_learning_rate,
                 "model.gbr_max_depth": config.model.gbr_max_depth,
@@ -158,7 +164,7 @@ class FxRvRegressionPlugin(Plugin, ConfigurablePlugin):
         context.tracking.log_artifact(str(summary_path), artifact_path="data")
 
         end = datetime.now(UTC)
-        primary_metric_key = f"{config.experiment.target_cols[0]}_test_rmse_log"
+        primary_metric_key = f"{config.experiment.target_cols[0]}_test_rmse"
         return RunResult(
             run_id=context.run_id,
             status="ok",

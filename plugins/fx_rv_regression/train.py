@@ -12,17 +12,6 @@ from .data import DataFrameSplits
 PCA_COLS = [f"PC{i}" for i in range(1, 7)]
 PCA_ABS_COLS = [f"{c}_abs" for c in PCA_COLS]
 RMS_STATS_COLS = ["rms5__mean", "rms5__std", "rms5__max"]
-RMS_VEC8_COLS = [
-    "rms5__GBP",
-    "rms5__USD",
-    "rms5__EUR",
-    "rms5__JPY",
-    "rms5__NZD",
-    "rms5__CAD",
-    "rms5__CHF",
-    "rms5__AUD",
-]
-STRESS_COLS = ["stress__pca_full_norm"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,55 +32,35 @@ class HorizonResult:
 
 
 def normalize_experiment_name(name: str) -> str:
-    aliases = {
-        "rv_regress_v1_persist": "rv_base_persist_shift1",
-        "rv_regress_v1_pca6abs_ridge": "rv_pca6_abs12_ridge",
-        "rv_regress_v1_pca6abs_gbr": "rv_pca6_abs12_gbr",
-    }
-    return aliases.get(name, name)
+    return name
 
 
 def resolve_experiment_plan(name: str) -> ExperimentPlan:
-    normalized = normalize_experiment_name(name)
-
-    if normalized == "rv_base_persist_shift1":
+    if name == "ignite_base_zero":
+        return ExperimentPlan(name=name, model_kind="zero", feature_cols=[], include_abs_pca=False)
+    if name == "ignite_base_shift1":
         return ExperimentPlan(
-            name=normalized,
-            model_kind="persistence",
-            feature_cols=[],
-            include_abs_pca=False,
+            name=name, model_kind="shift1", feature_cols=[], include_abs_pca=False
         )
-
-    if normalized == "rv_rms5_stats_ridge":
-        return ExperimentPlan(normalized, "ridge", RMS_STATS_COLS, include_abs_pca=False)
-    if normalized == "rv_rms5_stats_gbr":
-        return ExperimentPlan(normalized, "gbr", RMS_STATS_COLS, include_abs_pca=False)
-
-    if normalized == "rv_rms5_vec8_ridge":
-        return ExperimentPlan(normalized, "ridge", RMS_VEC8_COLS, include_abs_pca=False)
-    if normalized == "rv_rms5_vec8_gbr":
-        return ExperimentPlan(normalized, "gbr", RMS_VEC8_COLS, include_abs_pca=False)
-
-    if normalized == "rv_pca6_ridge":
-        return ExperimentPlan(normalized, "ridge", PCA_COLS, include_abs_pca=False)
-    if normalized == "rv_pca6_gbr":
-        return ExperimentPlan(normalized, "gbr", PCA_COLS, include_abs_pca=False)
-
-    if normalized == "rv_pca6_abs12_ridge":
-        return ExperimentPlan(normalized, "ridge", PCA_COLS, include_abs_pca=True)
-    if normalized == "rv_pca6_abs12_gbr":
-        return ExperimentPlan(normalized, "gbr", PCA_COLS, include_abs_pca=True)
-
-    if normalized == "rv_combo15_ridge":
-        return ExperimentPlan(normalized, "ridge", RMS_STATS_COLS + PCA_COLS, include_abs_pca=True)
-    if normalized == "rv_combo15_gbr":
-        return ExperimentPlan(normalized, "gbr", RMS_STATS_COLS + PCA_COLS, include_abs_pca=True)
-
-    if normalized == "rv_stress1_ridge":
-        return ExperimentPlan(normalized, "ridge", STRESS_COLS, include_abs_pca=False)
-    if normalized == "rv_stress1_gbr":
-        return ExperimentPlan(normalized, "gbr", STRESS_COLS, include_abs_pca=False)
-
+    if name == "ignite_rms5_stats_gbr":
+        return ExperimentPlan(
+            name=name, model_kind="gbr", feature_cols=RMS_STATS_COLS, include_abs_pca=False
+        )
+    if name == "ignite_pca6_gbr":
+        return ExperimentPlan(
+            name=name, model_kind="gbr", feature_cols=PCA_COLS, include_abs_pca=False
+        )
+    if name == "ignite_pca6_abs12_gbr":
+        return ExperimentPlan(
+            name=name, model_kind="gbr", feature_cols=PCA_COLS, include_abs_pca=True
+        )
+    if name == "ignite_combo15_gbr":
+        return ExperimentPlan(
+            name=name,
+            model_kind="gbr",
+            feature_cols=RMS_STATS_COLS + PCA_COLS,
+            include_abs_pca=True,
+        )
     raise ValueError(f"Unsupported experiment name: {name}")
 
 
@@ -105,13 +74,26 @@ def run_experiment(
 
     results: list[HorizonResult] = []
     for target_col in config.experiment.target_cols:
-        if plan.model_kind == "persistence":
-            predictions = run_persistence(target_col, splits)
+        if plan.model_kind == "zero":
+            predictions = run_zero_baseline(target_col, splits)
+            results.append(
+                HorizonResult(
+                    target_col=target_col,
+                    feature_cols=["constant_zero"],
+                    model_kind="zero",
+                    model=None,
+                    predictions_raw=predictions,
+                )
+            )
+            continue
+
+        if plan.model_kind == "shift1":
+            predictions = run_shift1_baseline(target_col, splits)
             results.append(
                 HorizonResult(
                     target_col=target_col,
                     feature_cols=[f"{target_col}_lag1"],
-                    model_kind="persistence",
+                    model_kind="shift1",
                     model=None,
                     predictions_raw=predictions,
                 )
@@ -127,7 +109,6 @@ def run_experiment(
         )
         model = _fit_model(
             config=config,
-            model_kind=plan.model_kind,
             X_train=frames["train"][feature_cols].to_numpy(),
             y_train=frames["train"]["__target_model__"].to_numpy(),
             seed=seed,
@@ -162,11 +143,30 @@ def run_experiment(
     return results
 
 
-def run_persistence(target_col: str, splits: DataFrameSplits) -> dict[str, pd.DataFrame]:
-    all_df = pd.concat(
-        [splits.train, splits.val, splits.test],
-        axis=0,
-    ).copy()
+def run_zero_baseline(target_col: str, splits: DataFrameSplits) -> dict[str, pd.DataFrame]:
+    pred_frames: dict[str, pd.DataFrame] = {}
+    for split_name, frame in {
+        "train": splits.train,
+        "val": splits.val,
+        "test": splits.test,
+    }.items():
+        pred = pd.DataFrame(
+            {
+                "date": pd.to_datetime(frame["__date__"], utc=True),
+                "y_true_raw": frame[target_col].to_numpy(dtype="float64"),
+                "y_pred_raw": np.zeros(len(frame), dtype="float64"),
+                "rms5__mean": frame["rms5__mean"].to_numpy()
+                if "rms5__mean" in frame.columns
+                else np.nan,
+            },
+            index=frame.index,
+        )
+        pred_frames[split_name] = pred
+    return pred_frames
+
+
+def run_shift1_baseline(target_col: str, splits: DataFrameSplits) -> dict[str, pd.DataFrame]:
+    all_df = pd.concat([splits.train, splits.val, splits.test], axis=0).copy()
     lag_col = f"{target_col}_lag1"
     all_df[lag_col] = all_df[target_col].shift(1)
 
@@ -197,7 +197,7 @@ def required_columns_for_experiment(name: str, targets: list[str]) -> set[str]:
     plan = resolve_experiment_plan(name)
     required = set(targets)
     required.update(plan.feature_cols)
-    if plan.model_kind == "persistence":
+    if plan.model_kind in {"zero", "shift1"}:
         required.update(targets)
     if plan.include_abs_pca:
         required.update(PCA_COLS)
@@ -251,29 +251,20 @@ def _build_feature_frames(
 def _fit_model(
     config: FxRvRegressionConfig,
     *,
-    model_kind: str,
     X_train: np.ndarray,
     y_train: np.ndarray,
     seed: int | None,
 ):
-    if model_kind == "ridge":
-        from sklearn.linear_model import Ridge
+    from sklearn.ensemble import GradientBoostingRegressor
 
-        return Ridge(alpha=config.model.ridge_alpha).fit(X_train, y_train)
-
-    if model_kind == "gbr":
-        from sklearn.ensemble import GradientBoostingRegressor
-
-        return GradientBoostingRegressor(
-            n_estimators=config.model.gbr_n_estimators,
-            learning_rate=config.model.gbr_learning_rate,
-            max_depth=config.model.gbr_max_depth,
-            min_samples_leaf=config.model.gbr_min_samples_leaf,
-            subsample=config.model.gbr_subsample,
-            random_state=seed,
-        ).fit(X_train, y_train)
-
-    raise ValueError(f"Unsupported model kind: {model_kind}")
+    return GradientBoostingRegressor(
+        n_estimators=config.model.gbr_n_estimators,
+        learning_rate=config.model.gbr_learning_rate,
+        max_depth=config.model.gbr_max_depth,
+        min_samples_leaf=config.model.gbr_min_samples_leaf,
+        subsample=config.model.gbr_subsample,
+        random_state=seed,
+    ).fit(X_train, y_train)
 
 
 def _transform_target(values: np.ndarray, *, use_log: bool, eps: float) -> np.ndarray:

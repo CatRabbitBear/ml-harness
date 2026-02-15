@@ -9,19 +9,12 @@ from plugins.fx_rv_regression import FxRvRegressionPlugin
 from tracking_clients import MlflowTrackingClient
 
 LADDER_EXPERIMENTS = [
-    "rv_base_persist_shift1",
-    "rv_rms5_stats_ridge",
-    "rv_rms5_stats_gbr",
-    "rv_rms5_vec8_ridge",
-    "rv_rms5_vec8_gbr",
-    "rv_pca6_ridge",
-    "rv_pca6_gbr",
-    "rv_pca6_abs12_ridge",
-    "rv_pca6_abs12_gbr",
-    "rv_combo15_ridge",
-    "rv_combo15_gbr",
-    "rv_stress1_ridge",
-    "rv_stress1_gbr",
+    "ignite_base_zero",
+    "ignite_base_shift1",
+    "ignite_rms5_stats_gbr",
+    "ignite_pca6_gbr",
+    "ignite_pca6_abs12_gbr",
+    "ignite_combo15_gbr",
 ]
 
 
@@ -55,7 +48,7 @@ def main() -> None:
         spec = RunSpec(
             plugin_key="fx.rv_regression",
             pipeline="train",
-            dataset_id="fx:rv_dataset:v1",
+            dataset_id="fx:ignite_dataset:v1",
             data_spec={
                 "dataset_path": dataset_path,
                 "split_name": "default",
@@ -63,11 +56,11 @@ def main() -> None:
             params={
                 "experiment": {
                     "name": experiment_name,
-                    "target_cols": ["rv_fwd5__mean", "rv_fwd10__mean", "rv_fwd20__mean"],
+                    "target_cols": ["ignite5", "ignite10", "ignite20"],
                 }
             },
             strict=True,
-            tags={"suite": "fx_rv_baseline_ladder"},
+            tags={"suite": "fx_ignite_baseline_ladder"},
         )
         result = run_pipeline(spec, registry=registry, tracking=tracking)
         print(experiment_name, result.status, result.run_id)

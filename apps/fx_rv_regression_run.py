@@ -35,14 +35,14 @@ def _resolve_dataset_path() -> str:
 
 
 def _resolve_experiment_name_override() -> str:
-    return os.environ.get("FX_RV_EXPERIMENT", "rv_base_persist_shift1")
+    return os.environ.get("FX_RV_EXPERIMENT", "ignite_base_zero")
 
 
 def main() -> None:
     spec = RunSpec(
         plugin_key="fx.rv_regression",
         pipeline="train",
-        dataset_id="fx:rv_dataset:v1",
+        dataset_id="fx:ignite_dataset:v1",
         data_spec={
             "dataset_path": _resolve_dataset_path(),
             "split_name": "default",
@@ -50,7 +50,7 @@ def main() -> None:
         params={
             "experiment": {
                 "name": _resolve_experiment_name_override(),
-                "target_cols": ["rv_fwd5__mean", "rv_fwd10__mean", "rv_fwd20__mean"],
+                "target_cols": ["ignite5", "ignite10", "ignite20"],
             }
         },
         strict=True,
